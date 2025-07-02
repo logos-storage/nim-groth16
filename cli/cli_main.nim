@@ -9,6 +9,8 @@ import std/times
 import std/options
 # import strformat
 
+import taskpools
+
 import groth16/prover
 import groth16/verifier
 import groth16/files/witness
@@ -203,11 +205,12 @@ proc cliMain(cfg: Config) =
     else:
       echo("generating proof...")
       let print_timings = cfg.measure_time and cfg.verbose
+      var pool = Taskpool.new(cfg.nthreads)
       withMeasureTime(cfg.measure_time,"proving"):
         if cfg.no_masking:
-          proof = generateProofWithTrivialMask(cfg.nthreads, print_timings, zkey, wtns)
+          proof = generateProofWithTrivialMask(zkey, wtns, pool, print_timings)
         else:
-          proof = generateProof(cfg.nthreads, print_timings, zkey, wtns)
+          proof = generateProof(zkey, wtns, pool, print_timings)
     
       if not (cfg.output_file == ""):
         echo("exporting the proof to " & quoted(cfg.output_file))

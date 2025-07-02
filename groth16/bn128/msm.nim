@@ -85,7 +85,7 @@ func msmConstantineG2*( coeffs: openArray[Fr[BN254_Snarks]] , points: openArray[
 
 const task_multiplier : int = 1
 
-proc msmMultiThreadedG1*( nthreads_hint: int, coeffs: seq[Fr[BN254_Snarks]] , points: seq[G1] ): G1 =
+proc msmMultiThreadedG1*( coeffs: seq[Fr[BN254_Snarks]] , points: seq[G1], pool: Taskpool ): G1 =
 
   # for N <= 255 , we use 1 thread
   # for N == 256 , we use 2 threads
@@ -94,11 +94,10 @@ proc msmMultiThreadedG1*( nthreads_hint: int, coeffs: seq[Fr[BN254_Snarks]] , po
 
   let N = coeffs.len
   assert( N == points.len, "incompatible sequence lengths" )
-  let nthreads_target = if (nthreads_hint<=0): countProcessors() else: min( nthreads_hint, 256 )
+  let nthreads_target = min( pool.numThreads, 256 )
   let nthreads = max( 1 , min( N div 128 , nthreads_target ) )
   let ntasks   = if nthreads>1: (nthreads*task_multiplier) else: 1
 
-  var pool = Taskpool.new(num_threads = nthreads)
   var pending : seq[FlowVar[mycurves.G1]] = newSeq[FlowVar[mycurves.G1]](ntasks)
 
   var a : int = 0
@@ -117,22 +116,18 @@ proc msmMultiThreadedG1*( nthreads_hint: int, coeffs: seq[Fr[BN254_Snarks]] , po
   for k in 0..<ntasks:
     res += sync pending[k]
 
-  pool.syncAll()    
-  pool.shutdown()
-
   return res
 
 #---------------------------------------
 
-proc msmMultiThreadedG2*( nthreads_hint: int, coeffs: seq[Fr[BN254_Snarks]] , points: seq[G2] ): G2 =
+proc msmMultiThreadedG2*( coeffs: seq[Fr[BN254_Snarks]] , points: seq[G2], pool: Taskpool ): G2 =
 
   let N = coeffs.len
   assert( N == points.len, "incompatible sequence lengths" )
-  let nthreads_target = if (nthreads_hint<=0): countProcessors() else: min( nthreads_hint, 256 )
+  let nthreads_target = min( pool.numThreads, 256 )
   let nthreads = max( 1 , min( N div 128 , nthreads_target ) )
   let ntasks   = if nthreads>1: (nthreads*task_multiplier) else: 1
 
-  var pool = Taskpool.new(num_threads = nthreads)
   var pending : seq[FlowVar[mycurves.G2]] = newSeq[FlowVar[mycurves.G2]](ntasks)
 
   var a : int = 0
@@ -150,9 +145,6 @@ proc msmMultiThreadedG2*( nthreads_hint: int, coeffs: seq[Fr[BN254_Snarks]] , po
   var res : G2 = infG2
   for k in 0..<ntasks:
     res += sync pending[k]
-
-  pool.syncAll()    
-  pool.shutdown()
 
   return res
 

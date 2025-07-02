@@ -2,6 +2,8 @@
 import std/unittest
 import std/sequtils
 
+import taskpools
+
 import groth16/prover
 import groth16/verifier
 import groth16/fake_setup
@@ -57,9 +59,11 @@ let myWitness =
 #-------------------------------------------------------------------------------
 
 proc testProof(zkey: ZKey, witness: Witness): bool = 
-  let proof = generateProof( 8, false, zkey, witness )
+  var pool = Taskpool.new()
+  let proof = generateProof( zkey, witness, pool )
   let vkey  = extractVKey( zkey)
   let ok    = verifyProof( vkey, proof )
+  pool.shutdown()
   return ok
 
 suite "prover":
