@@ -7,6 +7,8 @@
 # See <https://geometry.xyz/notebook/the-hidden-little-secret-in-snarkjs>
 #
 
+{.push raises:[].}
+
 #[
 import sugar
 import constantine/math/config/curves 
