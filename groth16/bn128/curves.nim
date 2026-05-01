@@ -256,7 +256,8 @@ func uncompressG1*( compr1 : ComprG1 ) : Option[G1] =
 
 #---------------------------------------
 
-# little-endian encoding of the X coord, with bit 255 set if `Y_imag > P/2`
+# little-endian encoding of the X coord (real and imaginary components, in that order), 
+# with the last, 511-th bit set if `Y_imag > P/2`
 func compressG2*( pt : G2 ) : ComprG2 = 
   var x_real_big : BigInt[254] 
   var x_imag_big : BigInt[254] 
