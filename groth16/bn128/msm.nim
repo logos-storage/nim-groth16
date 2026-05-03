@@ -22,6 +22,7 @@ import constantine/math/elliptic/ec_multi_scalar_mul            as msm except Su
 
 #import groth16/bn128/fields
 import groth16/bn128/curves as mycurves
+import groth16/sharedbuf
 
 #import groth16/misc    # TEMP DEBUGGING
 #import std/cpuinfo
@@ -80,6 +81,33 @@ func msmConstantineG2*( coeffs: openArray[Fr[BN254_Snarks]] , points: openArray[
   return rAff
 
 #-------------------------------------------------------------------------------
+# spawnable wrappers: take SharedBuf views, delegate to the core.
+# These are what `pool.spawn` calls, so they carry {.gcsafe, raises: [].}.
+#
+# Local aliases `AffG1`/`AffG2` are required because taskpools' `spawn` macro
+# does `getImpl().replaceSymsByIdents()`, which strips qualifications. With
+# `SharedBuf[mycurves.G1]` the bare ident `G1` then re-resolves to the enum
+# value `aff.G1` (of type `Subgroup`), not the type alias. Renaming dodges
+# the collision.
+
+type
+  AffG1 = mycurves.G1
+  AffG2 = mycurves.G2
+  FrBN  = Fr[BN254_Snarks]
+
+func msmConstantineG1Range( coeffs: SharedBuf[FrBN] ,
+                            points: SharedBuf[AffG1] ): AffG1
+                            {.gcsafe, raises: [].} =
+  msmConstantineG1( toOpenArray(coeffs.payload, 0, coeffs.len - 1),
+                    toOpenArray(points.payload, 0, points.len - 1) )
+
+func msmConstantineG2Range( coeffs: SharedBuf[FrBN] ,
+                            points: SharedBuf[AffG2] ): AffG2
+                            {.gcsafe, raises: [].} =
+  msmConstantineG2( toOpenArray(coeffs.payload, 0, coeffs.len - 1),
+                    toOpenArray(points.payload, 0, points.len - 1) )
+
+#-------------------------------------------------------------------------------
 
 const task_multiplier : int = 1
 
@@ -105,9 +133,9 @@ proc msmMultiThreadedG1*( coeffs: seq[Fr[BN254_Snarks]] , points: seq[G1], pool:
       b = (N*(k+1)) div ntasks
     else:
       b = N
-    let cs = coeffs[a..<b]
-    let ps = points[a..<b]
-    pending[k] = pool.spawn msmConstantineG1( cs, ps );
+    let cs = SharedBuf.view(toOpenArray(coeffs, a, b - 1))
+    let ps = SharedBuf.view(toOpenArray(points, a, b - 1))
+    pending[k] = pool.spawn msmConstantineG1Range(cs, ps)
     a = b
 
   var res : G1 = infG1
@@ -135,9 +163,9 @@ proc msmMultiThreadedG2*( coeffs: seq[Fr[BN254_Snarks]] , points: seq[G2], pool:
       b = (N*(k+1)) div ntasks
     else:
       b = N
-    let cs = coeffs[a..<b]
-    let ps = points[a..<b]
-    pending[k] = pool.spawn msmConstantineG2( cs, ps );
+    let cs = SharedBuf.view(toOpenArray(coeffs, a, b - 1))
+    let ps = SharedBuf.view(toOpenArray(points, a, b - 1))
+    pending[k] = pool.spawn msmConstantineG2Range(cs, ps)
     a = b
 
   var res : G2 = infG2
