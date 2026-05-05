@@ -28,9 +28,6 @@ import groth16/prover/shared
 
 proc finishPartialProofWithMask*( zkey: ZKey, wtns: Witness, partialProof: PartialProof, mask: Mask, pool: Taskpool, printTimings: bool): Proof =
 
-  when not (defined(gcArc) or defined(gcOrc) or defined(gcAtomicArc)):
-    {.fatal: "Compile with arc/orc!".}
-
   # if (zkey.header.curve != wtns.curve):
   #   echo( "zkey.header.curve = " & ($zkey.header.curve) )
   #   echo( "wtns.curve        = " & ($wtns.curve       ) )
