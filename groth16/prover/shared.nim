@@ -134,10 +134,10 @@ proc shiftEvalDomainTask(
   var local = newSeq[FrBN](n)
   for i in 0 ..< n: local[i] = values.payload[i]
 
-  let result = shiftEvalDomain(local, D, eta)
+  let res = shiftEvalDomain(local, D, eta)
 
   # Copy result → caller's output buffer through the SharedBuf payload pointer.
-  for i in 0 ..< n: output.payload[i] = result[i]
+  for i in 0 ..< n: output.payload[i] = res[i]
   return true
 
 # computes the quotient polynomial Q = (A*B - C) / Z

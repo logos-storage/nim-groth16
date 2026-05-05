@@ -1,4 +1,3 @@
-
 {.used.}
 
 # Multi-threading determinism tests.
@@ -7,18 +6,11 @@
 # the proof is a pure deterministic function of (zkey, witness). Sweeping the
 # taskpool thread count must produce byte-identical proof points. Any
 # divergence ⇒ data race in the multi-threaded MSM/NTT path.
-#
-# These tests run under both --mm:arc and --mm:refc via the `test` nimble
 
 import std/unittest
 import std/sequtils
 
 import taskpools
-
-# Without this, unittest's echo of the trailing `[OK]` line for the last test
-# can stay in stdio buffers when the process exits right after pool.shutdown()
-# joins its worker threads — making the suite look like it stopped early.
-#setStdIoUnbuffered()
 
 import groth16/prover
 import groth16/prover/groth16 as proverImpl
