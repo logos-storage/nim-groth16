@@ -1,11 +1,20 @@
 {.used.}
 
-# Multi-threading determinism tests.
+# Multi-threading correctness tests.
 #
-# `generateProofWithTrivialMask` zeros the masking coefficients (r=s=0), so
-# the proof is a pure deterministic function of (zkey, witness). Sweeping the
-# taskpool thread count must produce byte-identical proof points. Any
-# divergence ⇒ data race in the multi-threaded MSM/NTT path.
+# Two complementary checks:
+#
+#   1. Trivial-mask determinism (r=s=0): proof is a pure deterministic function
+#      of (zkey, witness), so sweeping the thread count must produce
+#      byte-identical proof points. Catches races that produce *different but
+#      still valid* proofs across configurations.
+#
+#   2. Random-mask end-to-end verify: proves with random masking (the
+#      production code path) under varied (gc-mode, thread-count) and asserts
+#      every resulting proof verifies. Random masks change the MSM coefficient
+#      inputs, which exercises the data-dependent (non-constant-time) parts of
+#      the MSM where coefficient-magnitude-driven races have historically
+#      hidden — invisible under trivial-mask testing.
 
 import std/unittest
 import std/sequtils
@@ -101,5 +110,25 @@ suite "multithreading":
       let proof = proveWithThreads(zkey, myWitness, j)
       check isEqualProof(reference, proof)
       check verifyWith(zkey, proof)
+
+  test "random-mask proofs verify across thread counts (Snarkjs)":
+    let zkey = createFakeCircuitSetup( myR1cs, flavour=Snarkjs )
+    let vkey = extractVKey(zkey)
+    for j in ThreadCounts:
+      var pool = Taskpool.new(numThreads = j)
+      defer: pool.shutdown()
+      for _ in 0 ..< 100:
+        let proof = generateProof(zkey, myWitness, pool, false)
+        check verifyProof(vkey, proof)
+
+  test "random-mask proofs verify across thread counts (JensGroth)":
+    let zkey = createFakeCircuitSetup( myR1cs, flavour=JensGroth )
+    let vkey = extractVKey(zkey)
+    for j in ThreadCounts:
+      var pool = Taskpool.new(numThreads = j)
+      defer: pool.shutdown()
+      for _ in 0 ..< 100:
+        let proof = generateProof(zkey, myWitness, pool, false)
+        check verifyProof(vkey, proof)
 
 
