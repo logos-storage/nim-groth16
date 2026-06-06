@@ -4,11 +4,11 @@ import groth16/files/export_json
 
 #-------------------------------------------------------------------------------
 
-proc exampleProveAndVerify() = 
+proc exampleProveAndVerify() =
   let zkey_fname : string = "./build/product.zkey"
   let wtns_fname : string = "./build/product.wtns"
-  let proof = testProveAndVerify( zkey_fname, wtns_fname)
-  
+  let (_, proof) = testProveAndVerify( zkey_fname, wtns_fname)
+
   exportPublicIO( "./build/nim_public.json" , proof )
   exportProof(    "./build/nim_proof.json"  , proof )
 

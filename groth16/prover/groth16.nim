@@ -33,9 +33,6 @@ import groth16/prover/shared
 
 proc generateProofWithMask*( zkey: ZKey, wtns: Witness, mask: Mask, pool: Taskpool, printTimings: bool): Proof =
 
-  when not (defined(gcArc) or defined(gcOrc) or defined(gcAtomicArc)):
-    {.fatal: "Compile with arc/orc!".}
-
   # if (zkey.header.curve != wtns.curve):
   #   echo( "zkey.header.curve = " & ($zkey.header.curve) )
   #   echo( "wtns.curve        = " & ($wtns.curve       ) )

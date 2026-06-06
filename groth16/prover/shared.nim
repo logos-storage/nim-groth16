@@ -18,9 +18,18 @@ import groth16/bn128
 import groth16/math/domain
 import groth16/math/poly
 import groth16/zkey_types
+import groth16/sharedbuf
 #import groth16/misc
 
 import groth16/prover/types
+
+# `FrBN` shadows `Fr[BN254_Snarks]` to dodge a taskpools `spawn` macro issue:
+# its `getImpl().replaceSymsByIdents()` doesn't roundtrip qualified generic
+# instantiations cleanly, so the bare ident `Fr[BN254_Snarks]` re-resolves
+# wrong at the wrapper-proc reconstruction step. Using a plain alias gives
+# the macro an unambiguous symbol to work with. Same workaround as
+# `AffG1`/`AffG2` in `groth16/bn128/msm.nim`.
+type FrBN = Fr[BN254_Snarks]
 
 #-------------------------------------------------------------------------------
 
@@ -96,16 +105,40 @@ func shiftEvalDomain*(
   var ds : seq[Fr[BN254_Snarks]] = multiplyByPowers( cs, eta )
   return polyForwardNTT( Poly(coeffs:ds), D )
 
-# Wraps shiftEvalDomain such that it can be called by Taskpool.spawn. The result
-# is written to the output parameter. Has an unused return type because
-# Taskpool.spawn cannot handle a void return type.
-func shiftEvalDomainTask*(
-  values: seq[Fr[BN254_Snarks]],
-  D: Domain,
-  eta: Fr[BN254_Snarks],
-  output: ptr Isolated[seq[Fr[BN254_Snarks]]]): bool =
+# Spawnable wrapper for shiftEvalDomain. Crosses the spawn boundary using
+# SharedBuf views — no GC type travels across, so this works under any
+# GC mode (refc / arc / orc).
+#
+# Contract: caller owns both `values` (read) and `output` (written),
+# both of length n. Caller must keep them alive until the FlowVar is sync'd.
+proc shiftEvalDomainTask(
+    values: SharedBuf[FrBN],
+    D: Domain,
+    eta: FrBN,
+    output: SharedBuf[FrBN]): bool
+    {.gcsafe, raises: [].} =
 
-  output[] = isolate shiftEvalDomain(values, D, eta)
+  let n = values.len
+
+  # TODO(perf): two N-sized boundary copies (input → `local`, `result` → output)
+  # are an artifact of `shiftEvalDomain` / `polyInverseNTT` / `polyForwardNTT`
+  # taking and returning `seq[Fr]`. To eliminate both:
+  #   1. Add `inverseNTTInto`/`forwardNTTInto` variants in `groth16/math/ntt.nim`
+  #      that take `openArray[Fr]` for input and `var openArray[Fr]` for output
+  #      (the inner workers already operate on stride/offset triples — change is
+  #      mechanical).
+  #   2. Rewrite this proc to call the `…Into` variants directly on
+  #      `toOpenArray(values)` and `toOpenArray(output)`.
+
+  # Copy input view → worker-local seq for the existing seq-flavoured core.
+  var local = newSeq[FrBN](n)
+  for i in 0 ..< n: local[i] = values.payload[i]
+
+  let res = shiftEvalDomain(local, D, eta)
+
+  # Copy result → caller's output buffer through the SharedBuf payload pointer.
+  for i in 0 ..< n: output.payload[i] = res[i]
+  return true
 
 # computes the quotient polynomial Q = (A*B - C) / Z
 # by computing the values on a shifted domain, and interpolating the result
@@ -116,28 +149,37 @@ proc computeQuotientPointwise*( abc: ABC, pool: TaskPool ): Poly =
   assert( abc.valuesCz.len == n )
 
   let D    = createDomain(n)
-  
-  # (eta*omega^j)^n - 1 = eta^n - 1 
+
+  # (eta*omega^j)^n - 1 = eta^n - 1
   # 1 / [ (eta*omega^j)^n - 1] = 1/(eta^n - 1)
   let eta   = createDomain(2*n).domainGen
   let invZ1 = invFr( smallPowFr(eta,n) - oneFr )
 
-  var outputA1, outputB1, outputC1: Isolated[seq[Fr[BN254_Snarks]]]
+  # Pre-allocate caller-owned output buffers; workers write into these
+  # through bare pointers, so nothing GC-managed crosses the spawn.
+  var outA = newSeq[Fr[BN254_Snarks]](n)
+  var outB = newSeq[Fr[BN254_Snarks]](n)
+  var outC = newSeq[Fr[BN254_Snarks]](n)
 
-  var taskA1 = pool.spawn shiftEvalDomainTask( abc.valuesAz, D, eta, addr outputA1 )
-  var taskB1 = pool.spawn shiftEvalDomainTask( abc.valuesBz, D, eta, addr outputB1 )
-  var taskC1 = pool.spawn shiftEvalDomainTask( abc.valuesCz, D, eta, addr outputC1 )
+  let taskA1 = pool.spawn shiftEvalDomainTask(
+      SharedBuf.view(toOpenArray(abc.valuesAz, 0, n - 1)),
+      D, eta,
+      SharedBuf.view(toOpenArray(outA, 0, n - 1)))
+  let taskB1 = pool.spawn shiftEvalDomainTask(
+      SharedBuf.view(toOpenArray(abc.valuesBz, 0, n - 1)),
+      D, eta,
+      SharedBuf.view(toOpenArray(outB, 0, n - 1)))
+  let taskC1 = pool.spawn shiftEvalDomainTask(
+      SharedBuf.view(toOpenArray(abc.valuesCz, 0, n - 1)),
+      D, eta,
+      SharedBuf.view(toOpenArray(outC, 0, n - 1)))
 
   discard sync taskA1
   discard sync taskB1
   discard sync taskC1
 
-  let A1 = outputA1.extract()
-  let B1 = outputB1.extract()
-  let C1 = outputC1.extract()
-
   var ys : seq[Fr[BN254_Snarks]] = newSeq[Fr[BN254_Snarks]]( n )
-  for j in 0..<n: ys[j] = ( A1[j]*B1[j] - C1[j] ) * invZ1
+  for j in 0..<n: ys[j] = ( outA[j]*outB[j] - outC[j] ) * invZ1
   let Q1 = polyInverseNTT( ys, D )
   let cs = multiplyByPowers( Q1.coeffs, invFr(eta) )
 
@@ -147,7 +189,7 @@ proc computeQuotientPointwise*( abc: ABC, pool: TaskPool ): Poly =
 
 # Snarkjs does something different, not actually computing the quotient poly
 # they can get away with this, because during the trusted setup, they
-# replace the points encoding the values `delta^-1 * tau^i * Z(tau)` by 
+# replace the points encoding the values `delta^-1 * tau^i * Z(tau)` by
 # (shifted) Lagrange bases.
 # see <https://geometry.xyz/notebook/the-hidden-little-secret-in-snarkjs>
 #
@@ -158,22 +200,29 @@ proc computeSnarkjsScalarCoeffs*( abc: ABC, pool: TaskPool ): seq[Fr[BN254_Snark
   let D    = createDomain(n)
   let eta  = createDomain(2*n).domainGen
 
-  var outputA1, outputB1, outputC1: Isolated[seq[Fr[BN254_Snarks]]]
+  var outA = newSeq[Fr[BN254_Snarks]](n)
+  var outB = newSeq[Fr[BN254_Snarks]](n)
+  var outC = newSeq[Fr[BN254_Snarks]](n)
 
-  var taskA1 = pool.spawn shiftEvalDomainTask( abc.valuesAz, D, eta, addr outputA1 )
-  var taskB1 = pool.spawn shiftEvalDomainTask( abc.valuesBz, D, eta, addr outputB1 )
-  var taskC1 = pool.spawn shiftEvalDomainTask( abc.valuesCz, D, eta, addr outputC1 )
+  let taskA1 = pool.spawn shiftEvalDomainTask(
+      SharedBuf.view(toOpenArray(abc.valuesAz, 0, n - 1)),
+      D, eta,
+      SharedBuf.view(toOpenArray(outA, 0, n - 1)))
+  let taskB1 = pool.spawn shiftEvalDomainTask(
+      SharedBuf.view(toOpenArray(abc.valuesBz, 0, n - 1)),
+      D, eta,
+      SharedBuf.view(toOpenArray(outB, 0, n - 1)))
+  let taskC1 = pool.spawn shiftEvalDomainTask(
+      SharedBuf.view(toOpenArray(abc.valuesCz, 0, n - 1)),
+      D, eta,
+      SharedBuf.view(toOpenArray(outC, 0, n - 1)))
 
   discard sync taskA1
   discard sync taskB1
   discard sync taskC1
 
-  let A1 = outputA1.extract()
-  let B1 = outputB1.extract()
-  let C1 = outputC1.extract()
-
   var ys : seq[Fr[BN254_Snarks]] = newSeq[Fr[BN254_Snarks]]( n )
-  for j in 0..<n: ys[j] = ( A1[j] * B1[j] - C1[j] ) 
+  for j in 0..<n: ys[j] = ( outA[j] * outB[j] - outC[j] )
 
   return ys
 

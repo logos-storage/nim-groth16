@@ -3,6 +3,8 @@
 import std/[times,os]
 import strformat
 
+import taskpools
+
 import groth16/prover
 import groth16/verifier
 import groth16/files/witness
@@ -23,7 +25,8 @@ proc testProveAndVerify*( zkey_fname, wtns_fname: string): (VKey,Proof) =
 
   echo("generating proof...")
   let start = cpuTime()
-  let proof = generateProof( zkey, witness )
+  var pool = Taskpool.new()
+  let proof = generateProof( zkey, witness ,pool)
   let elapsed = cpuTime() - start
   echo("proving took ",seconds(elapsed))
 
@@ -55,7 +58,8 @@ proc testFakeSetupAndVerify*( r1cs_fname, wtns_fname: string, flavour=Snarkjs): 
   let vkey  = extractVKey( zkey)
 
   let start = cpuTime()
-  let proof = generateProof( zkey, witness )
+  var pool = Taskpool.new()
+  let proof = generateProof( zkey, witness ,pool)
   let elapsed = cpuTime() - start
   echo("proving took ",seconds(elapsed))
 

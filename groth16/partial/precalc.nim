@@ -33,9 +33,6 @@ import groth16/partial/types
 
 proc generatePartialProof*( zkey: ZKey, pwtns: PartialWitness, pool: Taskpool, printTimings: bool): PartialProof =
 
-  when not (defined(gcArc) or defined(gcOrc) or defined(gcAtomicArc)):
-    {.fatal: "Compile with arc/orc!".}
-
   # assert( zkey.header.curve == wtns.curve )
 
   let partial_witness = pwtns.values
