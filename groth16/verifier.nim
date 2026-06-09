@@ -35,12 +35,9 @@ proc verifyProof* (vkey: VKey, prf: Proof): bool {.raises: [ValueError].} =
     raise newException(ValueError,
       "unsupported curve: expected \"bn128\", got \"" & prf.curve & "\"")
 
-  if not isInSubgroupG1(prf.pi_a):
-    raise newException(ValueError, "pi_a is not in subgroup G1")
-  if not isInSubgroupG2(prf.pi_b):
-    raise newException(ValueError, "pi_b is not in subgroup G2")
-  if not isInSubgroupG1(prf.pi_c):
-    raise newException(ValueError, "pi_c is not in subgroup G1")
+  if not isInSubgroupG1(prf.pi_a): return false
+  if not isInSubgroupG2(prf.pi_b): return false
+  if not isInSubgroupG1(prf.pi_c): return false
 
   var pubG1 : G1 = msmG1( prf.publicIO , vkey.vpoints.pointsIC )  
 

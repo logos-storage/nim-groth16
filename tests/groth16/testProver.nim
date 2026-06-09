@@ -114,26 +114,23 @@ suite "verifier input validation":
     expect ValueError:
       discard verifyProof(vkey, bad)
 
-  test "out-of-subgroup G2 pi_b raises ValueError":
+  test "out-of-subgroup G2 pi_b returns false":
     let (vkey, proof) = buildGoodProof()
     var bad = proof
     bad.pi_b = outOfSubgroupG2
-    expect ValueError:
-      discard verifyProof(vkey, bad)
+    check (not verifyProof(vkey, bad))
 
-  test "off-curve G1 pi_a raises ValueError":
+  test "off-curve G1 pi_a returns false":
     let (vkey, proof) = buildGoodProof()
     var bad = proof
     bad.pi_a = bogusG1
-    expect ValueError:
-      discard verifyProof(vkey, bad)
+    check (not verifyProof(vkey, bad))
 
-  test "off-curve G1 pi_c raises ValueError":
+  test "off-curve G1 pi_c returns false":
     let (vkey, proof) = buildGoodProof()
     var bad = proof
     bad.pi_c = bogusG1
-    expect ValueError:
-      discard verifyProof(vkey, bad)
+    check (not verifyProof(vkey, bad))
 
   test "known-good proof still verifies":
     let (vkey, proof) = buildGoodProof()
