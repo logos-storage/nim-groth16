@@ -31,24 +31,26 @@ import groth16/prover/shared
 # the prover
 #
 
-proc generateProofWithMask*( zkey: ZKey, wtns: Witness, mask: Mask, pool: Taskpool, printTimings: bool): Proof =
+proc generateProofWithMask*( zkey: ZKey, wtns: Witness, mask: Mask, pool: Taskpool, printTimings: bool): Proof {.raises: [ValueError].} =
 
-  # if (zkey.header.curve != wtns.curve):
-  #   echo( "zkey.header.curve = " & ($zkey.header.curve) )
-  #   echo( "wtns.curve        = " & ($wtns.curve       ) )
-
-  assert( zkey.header.curve == wtns.curve )
+  if zkey.header.curve != wtns.curve:
+    raise newException(ValueError,
+      "curve mismatch: zkey.header.curve=" & $zkey.header.curve &
+      " wtns.curve=" & $wtns.curve)
 
   let witness = wtns.values
 
   let hdr  : GrothHeader  = zkey.header
   let spec : SpecPoints   = zkey.specPoints
-  let pts  : ProverPoints = zkey.pPoints     
+  let pts  : ProverPoints = zkey.pPoints
 
   let nvars = hdr.nvars
   let npubs = hdr.npubs
 
-  assert( nvars == witness.len , "wrong witness length" )
+  if nvars != witness.len:
+    raise newException(ValueError,
+      "wrong witness length: expected " & $nvars &
+      " (zkey.header.nvars), got " & $witness.len)
 
   # remark: with the special variable "1" we actuall have (npub+1) public IO variables
   var pubIO = newSeq[Fr[BN254_Snarks]]( npubs + 1)
@@ -118,11 +120,11 @@ proc generateProofWithMask*( zkey: ZKey, wtns: Witness, mask: Mask, pool: Taskpo
 
 #-------------------------------------------------------------------------------
 
-proc generateProofWithTrivialMask*( zkey: ZKey, wtns: Witness, pool: Taskpool, printTimings: bool ): Proof =
+proc generateProofWithTrivialMask*( zkey: ZKey, wtns: Witness, pool: Taskpool, printTimings: bool ): Proof {.raises: [ValueError].} =
   let mask = Mask( r: zeroFr , s: zeroFr )
   return generateProofWithMask( zkey, wtns, mask, pool, printTimings )
 
-proc generateProof*( zkey: ZKey, wtns: Witness, pool: Taskpool, printTimings = false ): Proof =
+proc generateProof*( zkey: ZKey, wtns: Witness, pool: Taskpool, printTimings = false ): Proof {.raises: [ValueError].} =
   let mask = randomMask()
   return generateProofWithMask( zkey, wtns, mask, pool, printTimings )
 
