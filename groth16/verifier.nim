@@ -29,13 +29,15 @@ from groth16/prover import Proof
 # the verifier
 #
 
-proc verifyProof* (vkey: VKey, prf: Proof): bool =
+proc verifyProof* (vkey: VKey, prf: Proof): bool {.raises: [ValueError].} =
 
-  assert( prf.curve == "bn128" )
+  if prf.curve != "bn128":
+    raise newException(ValueError,
+      "unsupported curve: expected \"bn128\", got \"" & prf.curve & "\"")
 
-  assert( isInSubgroupG1(prf.pi_a) , "pi_a is not in G1" )
-  assert( isInSubgroupG2(prf.pi_b) , "pi_b is not in G2" )
-  assert( isInSubgroupG1(prf.pi_c) , "pi_c is not in G1" )
+  if not isInSubgroupG1(prf.pi_a): return false
+  if not isInSubgroupG2(prf.pi_b): return false
+  if not isInSubgroupG1(prf.pi_c): return false
 
   var pubG1 : G1 = msmG1( prf.publicIO , vkey.vpoints.pointsIC )  
 
