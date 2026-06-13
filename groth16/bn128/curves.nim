@@ -34,11 +34,14 @@ import groth16/bn128/fields
 
 #-------------------------------------------------------------------------------
 
-type G1*   = aff.EC_ShortW_Aff[Fp[BN254_Snarks] , aff.G1]
-type G2*   = aff.EC_ShortW_Aff[Fp2[BN254_Snarks], aff.G2]
+type AffG1*   = aff.EC_ShortW_Aff[Fp[BN254_Snarks] , aff.G1]
+type AffG2*   = aff.EC_ShortW_Aff[Fp2[BN254_Snarks], aff.G2]
 
 type ProjG1*  = prj.EC_ShortW_Prj[Fp[BN254_Snarks] , prj.G1]
 type ProjG2*  = prj.EC_ShortW_Prj[Fp2[BN254_Snarks], prj.G2]
+ 
+type G1* = AffG1
+type G2* = AffG2
 
 #-------------------------------------------------------------------------------
 # compressed points (supposedly compatible with arkworks-0.5)
