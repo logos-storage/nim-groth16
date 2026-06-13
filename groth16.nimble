@@ -4,7 +4,7 @@ author      = "Balazs Komuves"
 description = "Groth16 proof system"
 license     = "MIT OR Apache-2.0"
 
-skipDirs    = @["groth16/example"]
+skipDirs    = @["groth16/example","bench"]
 binDir      = "build"
 namedBin    = {"cli/cli_main": "nim-groth16"}.toTable()
 installExt  = @["nim"]
