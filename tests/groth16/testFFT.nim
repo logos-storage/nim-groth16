@@ -9,9 +9,9 @@ import constantine/named/properties_fields
 
 import groth16/bn128/fields
 import groth16/bn128/curves
-import groth16/bn128/rnd
-import groth16/bn128/debug
 import groth16/bn128/arrays
+# import groth16/bn128/rnd
+# import groth16/bn128/debug
 
 import groth16/math/domain
 import groth16/math/ntt

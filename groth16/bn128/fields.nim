@@ -9,7 +9,7 @@
 import sugar
 
 import std/bitops
-import std/sequtils
+# import std/sequtils
 
 import constantine/math/arithmetic
 import constantine/math/io/io_fields
@@ -42,6 +42,8 @@ const oneFp2*  = mkFp2( oneFp , zeroFp )
 
 const minusOneFp* = fromHex( Fp[BN254_Snarks], "0x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd46" )
 const minusOneFr* = fromHex( Fr[BN254_Snarks], "0x30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000000" )
+
+const oneHalfFr*  = fromHex( Fr[BN254_Snarks], "0x183227397098d014dc2822db40c0ac2e9419f4243cdcb848a1f0fac9f8000001" )
 
 #-------------------------------------------------------------------------------
 
@@ -152,7 +154,7 @@ func smallPowFr*(base: Fr, expo: int): Fr =
 
 #-------------------------------------------------------------------------------
 
-func deltaFr*[T](i, j: int) : Fr[T] =
+func deltaFr*(i, j: int) : Fr[BN254_Snarks] =
   return (if (i == j): oneFr else: zeroFr)
 
 #-------------------------------------------------------------------------------
@@ -171,17 +173,6 @@ func batchInverseFr*( xs: seq[Fr[BN254_Snarks]] ) : seq[Fr[BN254_Snarks]] =
   for i in countdown(n-2,0): vs[i] = vs[i+1] * xs[i+1]
   return collect( newSeq, (for i in 0..<n: us[i]*vs[i] ) )
 
-proc sanityCheckBatchInverseFr*() =
-  let xs = map( toSeq(101..137) , intToFr )
-  let ys = batchInverseFr( xs )
-  let zs = collect( newSeq, (for x in xs: invFr(x)) )
-  let n = xs.len
-  # for i in 0..<n: echo(i," | batch = ",toDecimalFr(ys[i])," | ref = ",toDecimalFr(zs[i]) )
-  for i in 0..<n:
-    if not bool(ys[i] == zs[i]):
-      echo "batch inverse test FAILED!"
-      return
-  echo "batch iverse test OK."
 
 #-------------------------------------------------------------------------------
 
