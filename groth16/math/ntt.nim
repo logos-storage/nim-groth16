@@ -18,7 +18,7 @@ import groth16/math/domain
 func forwardNTT_worker( m: int
                       , srcStride: int
                       , gpows: seq[Fr[BN254_Snarks]]
-                      , src: seq[Fr[BN254_Snarks]]     , srcOfs: int
+                      , src:     seq[Fr[BN254_Snarks]] , srcOfs: int
                       , buf: var seq[Fr[BN254_Snarks]] , bufOfs: int
                       , tgt: var seq[Fr[BN254_Snarks]] , tgtOfs: int ) =
   case m 
@@ -93,12 +93,11 @@ func extendAndForwardNTT*(src: seq[Fr[BN254_Snarks]], D: Domain): seq[Fr[BN254_S
 
 #-------------------------------------------------------------------------------
 
-const oneHalfFr* = fromHex(Fr[BN254_Snarks], "0x183227397098d014dc2822db40c0ac2e9419f4243cdcb848a1f0fac9f8000001")
-
+# unscaled!
 func inverseNTT_worker( m: int
                       , tgtStride: int
                       , gpows: seq[Fr[BN254_Snarks]]
-                      , src: seq[Fr[BN254_Snarks]]     , srcOfs: int
+                      , src:     seq[Fr[BN254_Snarks]] , srcOfs: int
                       , buf: var seq[Fr[BN254_Snarks]] , bufOfs: int
                       , tgt: var seq[Fr[BN254_Snarks]] , tgtOfs: int ) =
   case m 
@@ -109,8 +108,6 @@ func inverseNTT_worker( m: int
     of 1:
       tgt[tgtOfs          ] = ( src[srcOfs] + src[srcOfs+1] ) 
       tgt[tgtOfs+tgtStride] = ( src[srcOfs] - src[srcOfs+1] ) 
-      div2( tgt[tgtOfs          ] )
-      div2( tgt[tgtOfs+tgtStride] )
 
     else:
       let N     : int =  1 shl  m  
@@ -119,7 +116,6 @@ func inverseNTT_worker( m: int
       for j in 0..<halfN:
         buf[bufOfs+j      ] = ( src[srcOfs+j] + src[srcOfs+j+halfN] ) 
         buf[bufOfs+j+halfN] = ( src[srcOfs+j] - src[srcOfs+j+halfN] ) * gpows[ j*tgtStride ]
-        div2( buf[bufOfs+j ] )
 
       inverseNTT_worker( m-1
                        , tgtStride shl 1
@@ -137,7 +133,7 @@ func inverseNTT_worker( m: int
 #---------------------------------------
 
 # inverse number-theoretical transform (corresponds to polynomial interpolation)
-func inverseNTT*(src: seq[Fr[BN254_Snarks]], D: Domain): seq[Fr[BN254_Snarks]] =
+func toggableInverseNTT(src: seq[Fr[BN254_Snarks]], D: Domain, do_rescale: bool): seq[Fr[BN254_Snarks]] =
   assert( D.domainSize == (1 shl D.logDomainSize) , "domain must have a power-of-two size" )
   assert( D.domainSize == src.len , "input must have the same size as the domain" )
   var buf = newSeq[Fr[BN254_Snarks]]( 2 * D.domainSize )
@@ -147,7 +143,7 @@ func inverseNTT*(src: seq[Fr[BN254_Snarks]], D: Domain): seq[Fr[BN254_Snarks]] =
   let N     = D.domainSize
   let halFN = N div 2
   var gpows = newSeq[Fr[BN254_Snarks]]( halFN )
-  var x     = oneHalfFr
+  var x     = oneFr
   let ginv  = invFr( D.domainGen )
   for i in 0..<halfN:
     gpows[i] = x
@@ -159,6 +155,24 @@ func inverseNTT*(src: seq[Fr[BN254_Snarks]], D: Domain): seq[Fr[BN254_Snarks]] =
                    , src , 0
                    , buf , 0
                    , tgt , 0 )
+
+  if do_rescale:
+    var invN : Fr[BN254_Snarks]
+    invN.fromInt(N)
+    invN.inv() 
+    for i in 0..<N:
+      tgt[i] *= invN
+
   return tgt
+
+#-------------------------------------------------------------------------------
+
+# inverse number-theoretical transform (corresponds to polynomial interpolation)
+func inverseNTT*(src: seq[Fr[BN254_Snarks]], D: Domain): seq[Fr[BN254_Snarks]] =
+  toggableInverseNTT(src, D, true)
+
+# inverse number-theoretical transform, without the 1/N rescaling
+func unscaledInverseNTT*(src: seq[Fr[BN254_Snarks]], D: Domain): seq[Fr[BN254_Snarks]] =
+  toggableInverseNTT(src, D, false)
 
 #-------------------------------------------------------------------------------
