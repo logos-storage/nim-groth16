@@ -16,7 +16,7 @@ import groth16/bn128/arrays
 
 import groth16/math/domain
 import groth16/math/ntt
-import groth16/dynamic/group_fft
+import groth16/math/group_fft
 
 import shared
 
