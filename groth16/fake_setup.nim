@@ -13,6 +13,7 @@ import constantine/math/arithmetic
 import constantine/named/properties_fields
 
 import groth16/bn128
+#import groth16/bn128/arrays
 import groth16/math/domain
 import groth16/math/poly
 import groth16/zkey_types
@@ -186,16 +187,6 @@ func r1csToSparseMatrices*(r1cs: R1CS): SparseMatrices =
     columnInsertWithAddFr( matA[i-n] , i , oneFr )
 
   return SparseMatrices(A:matA, B:matB, C:matC)
-
-#-------------------------------------------------------------------------------
-
-func dotProdFr(xs, ys: seq[Fr[BN254_Snarks]]): Fr[BN254_Snarks] =
-  let n = xs.len
-  assert( n == ys.len, "dotProdFr: incompatible vector lengths" )
-  var s : Fr[BN254_Snarks] = zeroFr
-  for i in 0..<n:
-    s += xs[i] * ys[i]
-  return s
 
 #-------------------------------------------------------------------------------
 

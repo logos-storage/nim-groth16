@@ -16,6 +16,7 @@ import groth16/bn128/arrays
 import groth16/math/domain
 import groth16/math/ntt
 import groth16/math/group_fft
+import groth16/math/convolution
 
 #-------------------------------------------------------------------------------
 
@@ -69,4 +70,18 @@ suite "group FFT checks (for the group G1)":
 
 #-------------------------------------------------------------------------------
   
+suite "convolution checks":
 
+  let N = 64
+
+  let xs = randFrSeq(N)
+  let ys = randFrSeq(N)
+  let gs = randG1Seq(N)
+
+  test "FFT field convolutions vs. slow reference":
+    check isEqualFrSeq( fieldConvolution(xs,ys) , naiveFieldConvolution(xs,ys) )
+
+  test "FFT group convolutions vs. slow reference":
+    check isEqualG1Seq( groupConvolution(xs,gs) , naiveGroupConvolution(xs,gs) )
+
+#-------------------------------------------------------------------------------

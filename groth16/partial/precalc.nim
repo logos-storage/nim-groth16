@@ -6,7 +6,7 @@
 # between proofs - then such precalculation can result in a potentially big speedup.
 #
 # an example use is RLN proofs, where the circuit is dominated by the Merkle 
-#vinclusion proof check, which is expected to change relatively rarely.
+# inclusion proof check, which is expected to change relatively rarely.
 #
 
 {.push raises:[].}

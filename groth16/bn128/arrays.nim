@@ -32,6 +32,22 @@ proc scaleFrSeqInPlace*(s: Fr[BN254_Snarks], arr: var seq[Fr[BN254_Snarks]] ) =
   for i in 0..<N:
     arr[i] *= s
 
+proc pointwiseProdFr*(xs: seq[Fr[BN254_Snarks]], ys: seq[Fr[BN254_Snarks]]): seq[Fr[BN254_Snarks]] =
+  let N = xs.len
+  assert( N == ys.len )
+  var zs : seq[Fr[BN254_Snarks]] = newSeq[Fr[BN254_Snarks]]( N )
+  for i in 0..<N:
+    zs[i] = xs[i] * ys[i]
+  return zs
+
+func dotProdFr*(xs, ys: seq[Fr[BN254_Snarks]]): Fr[BN254_Snarks] =
+  let n = xs.len
+  assert( n == ys.len, "dotProdFr: incompatible vector lengths" )
+  var s : Fr[BN254_Snarks] = zeroFr
+  for i in 0..<n:
+    s += xs[i] * ys[i]
+  return s
+
 #-------------------------------------------------------------------------------
 # G1 arrays
 
@@ -57,5 +73,13 @@ proc scaleG1SeqInPlace*(s: Fr[BN254_Snarks], arr: var seq[G1] ) =
   let N = arr.len  
   for i in 0..<N:
     arr[i] = s ** arr[i]
+
+proc pointwiseScaleG1*(xs: seq[Fr[BN254_Snarks]], gs: seq[G1]): seq[G1] =
+  let N = xs.len
+  assert( N == gs.len )
+  var hs : seq[G1] = newSeq[G1]( N )
+  for i in 0..<N:
+    hs[i] = xs[i] ** gs[i]
+  return hs
 
 #-------------------------------------------------------------------------------

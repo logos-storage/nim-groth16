@@ -7,7 +7,6 @@
 #
 
 import sugar
-
 import std/bitops
 # import std/sequtils
 
@@ -34,8 +33,12 @@ const primeP*  : B = fromHex( B, "0x30644e72e131a029b85045b68181585d97816a916871
 
 const zeroFp*   = fromHex( Fp[BN254_Snarks], "0x00" )
 const zeroFr*   = fromHex( Fr[BN254_Snarks], "0x00" )
+
 const oneFp*    = fromHex( Fp[BN254_Snarks], "0x01" )
 const oneFr*    = fromHex( Fr[BN254_Snarks], "0x01" )
+
+const twoFp*    = fromHex( Fp[BN254_Snarks], "0x02" )
+const twoFr*    = fromHex( Fr[BN254_Snarks], "0x02" )
 
 const zeroFp2* = mkFp2( zeroFp, zeroFp )
 const oneFp2*  = mkFp2( oneFp , zeroFp )

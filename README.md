@@ -30,4 +30,5 @@ at your choice.
 - [ ] add Groth16 notes
 - [ ] document the `snarkjs` circuit-specific setup `H` points convention
 - [x] precalculate stuff for "partial" proofs
+- [ ] implement Dynark style "dynamic proofs" too
 - [ ] make it work for different curves
