@@ -44,6 +44,10 @@ type
     partialProof*   : PartialProof
     dyanPreprocess* : DynaPreprocess
 
+  OnlyAB* = object
+    valuesAz*    : seq[F]
+    valuesBz*    : seq[F]
+
   PartialAB* = object
     valuesAz*    : seq[F]
     valuesBz*    : seq[F]

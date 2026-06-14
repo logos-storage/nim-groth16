@@ -13,33 +13,9 @@ import groth16/math/convolution
 # import groth16/math/ntt
 
 import groth16/zkey_types
+
 import groth16/dynamic/types
-
-#-------------------------------------------------------------------------------
-
-# the "weight vector" from the Dynark paper
-#
-# these weights appear in the expansion of the
-# product of Lagrange polynomials `L_i(x)L_k(x)`)
-#
-func calculateWVec*( D: Domain ): seq[F] = 
-  let N = D.domainSize
-  var wvec : seq[F] = newSeq[F]( N )
-  let invN     : F = invFr( intToFr(N)  )
-  let invOmega : F = invFr( D.domainGen )
-  wvec[0] = zeroFr
-  for i in 1..<N:
-    wvec[i] = invN / ( smallPowFr(invOmega,i) - oneFr )
-  return wvec
-
-# reverse indexing vecBar[i] = vec[-i] 
-func fftReverseVec*[T]( vec: seq[T] ): seq[T] =
-  let N = vec.len
-  var vecBar: seq[T] = newSeq[T]( N )
-  vecBar[0] = vec[0]
-  for i in 1..<N:
-    vecBar[N-i] = vec[i]
-  return vecBar
+import groth16/dynamic/shared
 
 #-------------------------------------------------------------------------------
 

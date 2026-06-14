@@ -7,6 +7,29 @@ import groth16/bn128/curves
 import groth16/bn128/rnd
 
 #-------------------------------------------------------------------------------
+
+# proper mathematical modulo operation.
+# (all mainstream programming languages are fucked up... Except Haskell, Haskell gets it right)
+#
+# TODO: maybe move this somewhere else?
+func safeMod*(x: int, N: int): int =
+  if x >= 0:
+    return (x mod N)
+  else:
+    let d = ((-x) div N)
+    let y = x + (d+1)*N
+    return (y mod N)
+
+#-------------------------------------------------------------------------------
+# generic arrays
+
+func constSeq*[T]( N: int , y: T ): seq[T] =
+  var xs : seq[T] = newSeq[T]( N )
+  for i in 0..<N:
+    xs[i] = y
+  return xs
+
+#-------------------------------------------------------------------------------
 # Fr arrays
 
 proc randFrSeq*(N: int) : seq[Fr[BN254_Snarks]] = 
@@ -46,6 +69,13 @@ func dotProdFr*(xs, ys: seq[Fr[BN254_Snarks]]): Fr[BN254_Snarks] =
   var s : Fr[BN254_Snarks] = zeroFr
   for i in 0..<n:
     s += xs[i] * ys[i]
+  return s
+
+func sumSeqFr*(xs : seq[Fr[BN254_Snarks]]): Fr[BN254_Snarks] =
+  let n = xs.len
+  var s : Fr[BN254_Snarks] = zeroFr
+  for i in 0..<n:
+    s += xs[i]
   return s
 
 #-------------------------------------------------------------------------------

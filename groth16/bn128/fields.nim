@@ -135,6 +135,10 @@ func `/`*(x, y: Fp ): Fp  =  ( var z : Fp  = x ; z *= invFr(y) ; return z )
 func `/`*(x, y: Fp2): Fp2 =  ( var z : Fp2 = x ; z *= invFr(y) ; return z )
 func `/`*(x, y: Fr ): Fr  =  ( var z : Fr  = x ; z *= invFr(y) ; return z )
 
+func divBy2Fp* (x: Fp ): Fp = ( var z : Fp  = x ; div2(z) ; return z )
+func divBy2Fp2*(x: Fp2): Fp2= ( var z : Fp2 = x ; div2(z) ; return z )
+func divBy2Fr* (x: Fr ): Fr = ( var z : Fr  = x ; div2(z) ; return z )
+
 # template/generic instantiation of `pow_vartime` from here
 # /Users/bkomuves/.nimble/pkgs/constantine-0.0.1/constantine/math/arithmetic/finite_fields.nim(389, 7) template/generic instantiation of `fieldMod` from here
 # /Users/bkomuves/.nimble/pkgs/constantine-0.0.1/constantine/math/config/curves_prop_field_derived.nim(67, 5) Error: undeclared identifier: 'getCurveOrder'

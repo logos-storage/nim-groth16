@@ -2,6 +2,8 @@
 #
 # FFT for groups elements
 #
+# TODO: flip the order of arguments, so that the domain is first...
+#
 
 #-------------------------------------------------------------------------------
 

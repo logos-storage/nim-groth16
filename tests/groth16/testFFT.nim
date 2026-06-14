@@ -26,17 +26,17 @@ suite "field NTT checks":
   let N = D.domainSize
   let xs : seq[Fr[BN254_Snarks]] = randFrSeq(N)
 
-  test "INTT(NTT(xs) == xs":
+  test "INTT(NTT(xs)) == xs":
     let ys = forwardNTT(xs, D)
     let zs = inverseNTT(ys, D) 
     check isEqualFrSeq( xs , zs )
   
-  test "NTT(INTT(xs) == xs":
+  test "NTT(INTT(xs)) == xs":
     let ys = inverseNTT(xs, D)
     let zs = forwardNTT(ys, D) 
     check isEqualFrSeq( xs , zs )
 
-  test "unscaledINTT(NTT(xs) == N * xs":
+  test "unscaledINTT(NTT(xs)) == N * xs":
     let ys = forwardNTT(xs, D)
     let zs = unscaledInverseNTT(ys, D) 
     var ws = xs
@@ -51,17 +51,17 @@ suite "group FFT checks (for the group G1)":
   let N = D.domainSize
   let gs : seq[G1] = randG1Seq(N)
 
-  test "IFFT(FFT(gs) == gs":
+  test "IFFT(FFT(gs)) == gs":
     let hs = forwardGroupFFT(gs, D)
     let rs = inverseGroupFFT(hs, D) 
     check isEqualG1Seq( gs , rs )
   
-  test "FFT(IFFT(xs) == xs":
+  test "FFT(IFFT(xs)) == xs":
     let hs = inverseGroupFFT(gs, D)
     let rs = forwardGroupFFT(hs, D) 
     check isEqualG1Seq( gs , rs )
 
-  test "FFT(unscaledIFFT(gs) == N * gs":
+  test "FFT(unscaledIFFT(gs)) == N * gs":
     let hs = unscaledInverseGroupFFT(gs, D)
     let rs = forwardGroupFFT(hs, D) 
     var qs = gs

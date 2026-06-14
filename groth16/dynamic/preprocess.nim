@@ -26,6 +26,7 @@ import groth16/math/poly
 
 import groth16/dynamic/types
 import groth16/dynamic/setup
+import groth16/dynamic/shared
 
 #-------------------------------------------------------------------------------
 
