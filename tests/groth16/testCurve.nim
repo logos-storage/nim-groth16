@@ -9,8 +9,32 @@ import constantine/math/io/io_fields
 import constantine/named/properties_fields 
 import constantine/math/extension_fields/towers 
 
+import groth16/bn128
 import groth16/bn128/fields
 import groth16/bn128/curves
+import groth16/bn128/rnd
+
+#-------------------------------------------------------------------------------
+
+suite "curve arithmetic":
+
+  test "G1 add/sub":
+    let g = randG1()
+    let h = randG1()
+    let lhs = g - h
+    let rhs = g + negG1(h)
+    var x = g
+    x -= h
+    check ((lhs === rhs) and (x === lhs))
+
+  test "G2 add/sub":
+    let g = randG2()
+    let h = randG2()
+    let lhs = g - h
+    let rhs = g + negG2(h)
+    var x = g
+    x -= h
+    check ((lhs === rhs) and (x === lhs))
 
 #-------------------------------------------------------------------------------
 

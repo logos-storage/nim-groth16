@@ -321,6 +321,15 @@ func addG1*(p,q: G1): G1 =
   prj.affine(s, r)
   return s
 
+func subG1*(p,q: G1): G1 =
+  var r, x, y : ProjG1
+  prj.fromAffine(x, p)
+  prj.fromAffine(y, q)
+  prj.diff(r, x, y)
+  var s : G1
+  prj.affine(s, r)
+  return s
+
 #---------------------------------------
 
 func addG2*(p,q: G2): G2 =
@@ -328,6 +337,15 @@ func addG2*(p,q: G2): G2 =
   prj.fromAffine(x, p)
   prj.fromAffine(y, q)
   prj.sum(r, x, y)
+  var s : G2
+  prj.affine(s, r)
+  return s
+
+func subG2*(p,q: G2): G2 =
+  var r, x, y : ProjG2
+  prj.fromAffine(x, p)
+  prj.fromAffine(y, q)
+  prj.diff(r, x, y)
   var s : G2
   prj.affine(s, r)
   return s
@@ -347,11 +365,14 @@ func negG2*(p: G2): G2 =
 func `+`*(p,q: G1): G1 = addG1(p,q)
 func `+`*(p,q: G2): G2 = addG2(p,q)
 
+func `-`*(p,q: G1): G1 = subG1(p,q)
+func `-`*(p,q: G2): G2 = subG2(p,q)
+
 func `+=`*(p: var G1, q: G1) =    p = addG1(p,q)
 func `+=`*(p: var G2, q: G2) =    p = addG2(p,q)
 
-func `-=`*(p: var G1, q: G1) =    p = addG1(p,negG1(q))
-func `-=`*(p: var G2, q: G2) =    p = addG2(p,negG2(q))
+func `-=`*(p: var G1, q: G1) =    p = subG1(p,q)
+func `-=`*(p: var G2, q: G2) =    p = subG2(p,q)
 
 #-------------------------------------------------------------------------------
 #

@@ -31,9 +31,9 @@ type
 
   # things we can compute at circuit setup time
   DynaSetupV1* = object
-    pointsDeltaL* : seq[G1]      # the points `delta^-1 * L_i(tau) * Z(tau) * g1`
-    weightVec*    : seq[F]       # the weights `W_k = 1/N/(omega^-k - 1)`
-    wConvDeltaL*  : seq[G1]      # the convolution of `W` and `deltaL`
+    weightVec*     : seq[F]       # the weights `W_k = 1/N/(omega^-k - 1)`
+    pointsDeltaLZ* : seq[G1]      # the points `delta^-1 * L_i(tau) * Z(tau) * g1` where `Z(x) = x^N-1`
+    wConvDeltaLZ*  : seq[G1]      # the convolution of `W` and `pointsDeltaLZ`
 
   # things we can compute from the partial witness
   DynaPreprocess* = object

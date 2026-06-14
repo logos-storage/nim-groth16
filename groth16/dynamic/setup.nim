@@ -1,0 +1,85 @@
+
+{.push raises:[].}
+
+# import constantine/named/properties_fields
+
+import groth16/bn128
+
+import groth16/math/domain
+import groth16/math/group_fft
+import groth16/math/poly
+import groth16/math/convolution
+# import groth16/math/convert
+# import groth16/math/ntt
+
+import groth16/zkey_types
+import groth16/dynamic/types
+
+#-------------------------------------------------------------------------------
+
+# the "weight vector" from the Dynark paper
+#
+# these weights appear in the expansion of the
+# product of Lagrange polynomials `L_i(x)L_k(x)`)
+#
+func calculateWVec*( D: Domain ): seq[F] = 
+  let N = D.domainSize
+  var wvec : seq[F] = newSeq[F]( N )
+  let invN     : F = invFr( intToFr(N)  )
+  let invOmega : F = invFr( D.domainGen )
+  wvec[0] = zeroFr
+  for i in 1..<N:
+    wvec[i] = invN / ( smallPowFr(invOmega,i) - oneFr )
+  return wvec
+
+# reverse indexing vecBar[i] = vec[-i] 
+func fftReverseVec*[T]( vec: seq[T] ): seq[T] =
+  let N = vec.len
+  var vecBar: seq[T] = newSeq[T]( N )
+  vecBar[0] = vec[0]
+  for i in 1..<N:
+    vecBar[N-i] = vec[i]
+  return vecBar
+
+#-------------------------------------------------------------------------------
+
+# does the setup from the ZKey (prover key)
+func dynaSetupV1FromZKey*(zkey: Zkey): DynaSetupV1 = 
+
+  assert( zkey.header.flavour == JensGroth , "DynaSetupV1 requires classic (quotient) flavour, not Jordi's one!" )
+
+  let N = zkey.header.domainSize
+  let D = createDomain(N)
+  
+  let deltaLZ = inverseGroupFFT( zkey.pPoints.pointsH1 , D )
+  let wvec    = calculateWVec( D )
+  let conv    = groupConvolution( wvec , deltaLZ )
+
+  return DynaSetupV1( pointsDeltaLZ : deltaLZ , 
+                      weightVec     : wvec    ,
+                      wConvDeltaLZ  : conv    )
+
+#---------------------------------------
+
+# simulates a setup (from the "toxic waste" values `tau` and `delta`), so that 
+# we can test components of the system
+func simulateDynaSetupV1*( D: Domain, tau: F, delta: F ): DynaSetupV1 = 
+
+  let N = D.domainSize
+  let ztau:      F = smallPowFr(tau,N) - oneFr
+  let deltaZTau: F = ztau / delta
+
+  # compute `delta^-1 * L_i(tau) * (tau^N - 1) ** g1 
+  var deltaLZ: seq[G1] = newSeq[G1]( N ) 
+  for i in 0..<N: 
+    let y: F = deltaZTau * evalLagrangePolyAt( D, i, tau )    
+    deltaLZ[i] = y ** gen1
+
+  let wvec   = calculateWVec( D )
+  let conv   = groupConvolution( wvec , deltaLZ )
+
+  return DynaSetupV1( weightVec     : wvec    ,
+                      pointsDeltaLZ : deltaLZ , 
+                      wConvDeltaLZ  : conv    )
+
+#-------------------------------------------------------------------------------
