@@ -46,17 +46,6 @@ func ceilingLog2* (x : int) : int =
   else:
     return (floorLog2(x-1) + 1)
 
-#-------------------
-
-#[
-import std/math
-
-proc sanityCheckLog2* () =
-  for i in 0..18:
-    let x = float64(i)
-    echo( i," | ",floorLog2(i),"=",floor(log2(x))," | ",ceilingLog2(i),"=",ceil(log2(x)) )
-]#
-
 #-------------------------------------------------------------------------------
 
 #[

@@ -4,6 +4,7 @@ import constantine/named/properties_fields
 import constantine/math/extension_fields/towers
 
 import groth16/bn128
+import groth16/math/matrix
 
 #-------------------------------------------------------------------------------
 
@@ -68,6 +69,7 @@ type
 
 #-------------------------------------------------------------------------------
 
+# extract the verification key
 func extractVKey*(zkey: Zkey): VKey = 
   let curve = zkey.header.curve
   let spec  = zkey.specPoints
@@ -75,18 +77,52 @@ func extractVKey*(zkey: Zkey): VKey =
   return VKey(curve:curve, spec:spec, vpoints:vpts)
 
 #-------------------------------------------------------------------------------
+# extract the three matrices from the ZKey
 
-proc printGrothHeader*(hdr: GrothHeader) = 
-  echo("curve        = " & ($hdr.curve        ) ) 
-  echo("flavour      = " & ($hdr.flavour      ) ) 
-  echo("|Fp|         = " & (toDecimalBig(hdr.p)) ) 
-  echo("|Fr|         = " & (toDecimalBig(hdr.r)) ) 
-  echo("nvars        = " & ($hdr.nvars        ) ) 
-  echo("npubs        = " & ($hdr.npubs        ) ) 
-  echo("domainSize   = " & ($hdr.domainSize   ) ) 
-  echo("logDomainSize= " & ($hdr.logDomainSize) ) 
+func coeffsToSparseMatrices*( dims: MatrixDims, coeffs: seq[Coeff]): SparseMatrices = 
+  var A: SparseMatrixColumns[Fr[BN254_Snarks]] = newSeq[SparseColumn[Fr[BN254_Snarks]]] ( dims.ncols )
+  var B: SparseMatrixColumns[Fr[BN254_Snarks]] = newSeq[SparseColumn[Fr[BN254_Snarks]]] ( dims.ncols )
+  var C: SparseMatrixColumns[Fr[BN254_Snarks]] = newSeq[SparseColumn[Fr[BN254_Snarks]]] ( dims.ncols )
+ 
+  for cf in coeffs:
+    case cf.matrix
+      of MatrixA: columnInsertWithAddFr( A[cf.col] , cf.row , cf.coeff )
+      of MatrixB: columnInsertWithAddFr( B[cf.col] , cf.row , cf.coeff ) 
+      of MatrixC: columnInsertWithAddFr( C[cf.col] , cf.row , cf.coeff )
+ 
+  let mA = SparseMatrix[Fr[BN254_Snarks]]( dims: dims , columns: A )
+  let mB = SparseMatrix[Fr[BN254_Snarks]]( dims: dims , columns: B )
+  let mC = SparseMatrix[Fr[BN254_Snarks]]( dims: dims , columns: C )
+  return SparseMatrices( A: mA, B: mB, C: mC )
+
+func zkeyToSparseMatrices*(zkey: ZKey): SparseMatrices = 
+  let dims = MatrixDims( nrows: zkey.header.domainSize , ncols: zkey.header.nvars )
+  return coeffsToSparseMatrices( dims , zkey.coeffs )
 
 #-------------------------------------------------------------------------------
+
+proc printGrothHeader*(hdr: GrothHeader) = 
+  echo("")
+  echo("curve         = " & ($hdr.curve        ) ) 
+  echo("flavour       = " & ($hdr.flavour      ) ) 
+  echo("|Fp|          = " & (toDecimalBig(hdr.p)) ) 
+  echo("|Fr|          = " & (toDecimalBig(hdr.r)) ) 
+  echo("nvars         = " & ($hdr.nvars        ) ) 
+  echo("npubs         = " & ($hdr.npubs        ) ) 
+  echo("domainSize    = " & ($hdr.domainSize   ) ) 
+  echo("logDomainSize = " & ($hdr.logDomainSize) ) 
+
+#-------------------------------------------------------------------------------
+
+proc printR1csStats*(zkey: ZKey) = 
+  let matrices = zkeyToSparseMatrices(zkey)
+  echo "average row density of A = " & $(sparseMatrixAvgRowDensity(matrices.A))
+  echo "average row density of B = " & $(sparseMatrixAvgRowDensity(matrices.B))
+  # echo "average row density of C = " & $(sparseMatrixAvgRowDensity(matrices.C))
+  # the matrix C is not included in ZKey
+
+#-------------------------------------------------------------------------------
+# debugging
 
 func matrixSelToString(sel: MatrixSel): string = 
   case sel 
@@ -105,3 +141,4 @@ proc debugPrintCoeffs*(cfs: seq[Coeff]) =
   for cf in cfs: debugPrintCoeff(cf)
 
 #-------------------------------------------------------------------------------
+

@@ -36,18 +36,20 @@ type
     wConvDeltaLZ*  : seq[G1]      # the convolution of `W` and `pointsDeltaLZ`
 
   # things we can compute from the partial witness
-  DynaPreprocess* = object
+  DynaPreprocessV1* = object
     projA0*       : seq[G1]      # the points `delta^-1 * A0(tau) * L_i(tau) * g1` (well, "modulo Z(tau)")
     projB0*       : seq[G1]      # the same for B0
 
-  DynaPreProof* = object
+  DynaPreProofV1* = object
     partialProof*   : PartialProof
-    dyanPreprocess* : DynaPreprocess
+    dyanPreprocess* : DynaPreprocessV1
 
+  # this is used in the "cross-term"
   OnlyAB* = object
     valuesAz*    : seq[F]
     valuesBz*    : seq[F]
 
+  # this one is used in the "projection-term"
   PartialAB* = object
     valuesAz*    : seq[F]
     valuesBz*    : seq[F]

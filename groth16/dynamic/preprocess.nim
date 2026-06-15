@@ -115,7 +115,7 @@ proc testProjectionElementsV1*(N: int, tau: F, delta: F ): bool =
 
 #---------------------------------------
 
-func dynaPreprocessV1*(zkey: ZKey, setup: DynaSetupV1, partialWitness: PartialWitness): DynaPreprocess =
+func dynaPreprocessV1*(zkey: ZKey, setup: DynaSetupV1, partialWitness: PartialWitness): DynaPreprocessV1 =
   let N = zkey.header.domainSize
   let D = createDomain(N)
 
@@ -126,7 +126,7 @@ func dynaPreprocessV1*(zkey: ZKey, setup: DynaSetupV1, partialWitness: PartialWi
   let projA = projectionElementsV1( setup , D , partialAB.valuesAz , partialAB.complImageA )
   let projB = projectionElementsV1( setup , D , partialAB.valuesBz , partialAB.complImageB )
   
-  return DynaPreprocess( projA0: projA, projB0: projB )
+  return DynaPreprocessV1( projA0: projA, projB0: projB )
 
 #-------------------------------------------------------------------------------
 

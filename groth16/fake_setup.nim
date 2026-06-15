@@ -15,6 +15,7 @@ import constantine/named/properties_fields
 import groth16/bn128
 #import groth16/bn128/arrays
 import groth16/math/domain
+import groth16/math/matrix
 import groth16/math/poly
 import groth16/zkey_types
 import groth16/files/r1cs
@@ -68,16 +69,6 @@ func r1csToCoeffs*(r1cs: R1CS): seq[Coeff] =
 
 #-------------------------------------------------------------------------------
 # Note: dense matrices can be very big, this is only feasible for small circuits
-
-type DenseColumn*[T] = seq[T]
-
-type DenseMatrix*[T] = seq[DenseColumn[T]]
-
-type 
-  DenseMatrices* = object
-    A* : DenseMatrix[Fr[BN254_Snarks]]
-    B* : DenseMatrix[Fr[BN254_Snarks]]
-    C* : DenseMatrix[Fr[BN254_Snarks]]
 
 #[
 
@@ -137,36 +128,17 @@ func denseMatricesToCoeffs*(matrices: DenseMatrices): seq[Coeff] =
 
 #-------------------------------------------------------------------------------
 
-type SparseColumn*[T] = Table[int,T]
-
-proc columnInsertWithAddFr( col: var SparseColumn[Fr[BN254_Snarks]] , i: int,  y: Fr[BN254_Snarks] ) =
-  var x = getOrDefault( col, i, zeroFr )
-  x += y
-  col[i] = x
-
-proc sparseDenseDotProdFr( U: SparseColumn[Fr[BN254_Snarks]], V: DenseColumn[Fr[BN254_Snarks]] ): Fr[BN254_Snarks] =
-  var acc : Fr[BN254_Snarks] = zeroFr
-  for i,x in U.pairs:
-    acc += x * V[i]
-  return acc
-
-type SparseMatrix*[T] = seq[SparseColumn[T]]
-
-type 
-  SparseMatrices* = object
-    A* : SparseMatrix[Fr[BN254_Snarks]]
-    B* : SparseMatrix[Fr[BN254_Snarks]]
-    C* : SparseMatrix[Fr[BN254_Snarks]]
-
 func r1csToSparseMatrices*(r1cs: R1CS): SparseMatrices =
   let n = r1cs.constraints.len
   let m = r1cs.cfg.nWires
   let p = r1cs.cfg.nPubIn + r1cs.cfg.nPubOut
 
+  let dims = MatrixDims( nrows: n , ncols: m )
+
   let logDomSize = ceilingLog2(n+p+1)
   let domSize    = 1 shl logDomSize
 
-  var matA, matB, matC: SparseMatrix[Fr[BN254_Snarks]]
+  var matA, matB, matC: SparseMatrixColumns[Fr[BN254_Snarks]]
   for i in 0..<m:
     var colA : SparseColumn[Fr[BN254_Snarks]] = initTable[int,Fr[BN254_Snarks]]()
     var colB : SparseColumn[Fr[BN254_Snarks]] = initTable[int,Fr[BN254_Snarks]]()
@@ -186,7 +158,10 @@ func r1csToSparseMatrices*(r1cs: R1CS): SparseMatrices =
   for i in n..n+p:
     columnInsertWithAddFr( matA[i-n] , i , oneFr )
 
-  return SparseMatrices(A:matA, B:matB, C:matC)
+  let mA = SparseMatrix[Fr[BN254_Snarks]]( dims: dims , columns: matA )
+  let mB = SparseMatrix[Fr[BN254_Snarks]]( dims: dims , columns: matB )
+  let mC = SparseMatrix[Fr[BN254_Snarks]]( dims: dims , columns: matC )
+  return SparseMatrices(A:mA, B:mB, C:mC)
 
 #-------------------------------------------------------------------------------
 
@@ -253,9 +228,9 @@ func fakeCircuitSetup*(r1cs: R1CS, toxic: ToxicWaste, flavour=Snarkjs): ZKey =
   let columnTausC  : seq[Fr] = collect( newSeq, (for col in matrices.C: dotProdFr(col,lagrangeTaus) ))
 ]#
 
-  let columnTausA  : seq[Fr[BN254_Snarks]] = collect( newSeq, (for col in matrices.A: sparseDenseDotProdFr(col,lagrangeTaus) ))
-  let columnTausB  : seq[Fr[BN254_Snarks]] = collect( newSeq, (for col in matrices.B: sparseDenseDotProdFr(col,lagrangeTaus) ))
-  let columnTausC  : seq[Fr[BN254_Snarks]] = collect( newSeq, (for col in matrices.C: sparseDenseDotProdFr(col,lagrangeTaus) ))
+  let columnTausA  : seq[Fr[BN254_Snarks]] = collect( newSeq, (for col in matrices.A.columns: sparseDenseDotProdFr(col,lagrangeTaus) ))
+  let columnTausB  : seq[Fr[BN254_Snarks]] = collect( newSeq, (for col in matrices.B.columns: sparseDenseDotProdFr(col,lagrangeTaus) ))
+  let columnTausC  : seq[Fr[BN254_Snarks]] = collect( newSeq, (for col in matrices.C.columns: sparseDenseDotProdFr(col,lagrangeTaus) ))
 
   let pointsA  : seq[G1] = collect( newSeq , (for y in columnTausA: (y ** gen1) ))
   let pointsB1 : seq[G1] = collect( newSeq , (for y in columnTausB: (y ** gen1) ))

@@ -1,4 +1,5 @@
 
+import ./groth16/testMisc
 import ./groth16/testField
 import ./groth16/testCurve
 import ./groth16/testPoly
