@@ -13,6 +13,7 @@ import groth16/bn128/arrays
 import groth16/math/domain
 import groth16/math/ntt
 import groth16/math/poly
+import groth16/math/convolution
 
 import groth16/dynamic/types
 import groth16/dynamic/shared
@@ -61,6 +62,30 @@ suite "dynamic proof (Dynark) tests":
     inplaceMulByFFTofWVecBar( xs ) 
     let ys = forwardNTT( calculateWVecBar(D) , D ) 
     check isEqualFrSeq( xs , ys)
+
+  test "field convolution with Wvec":
+    let xs  = randFrSeq( N )
+    let lhs = fieldConvolveWithWVec( D , xs ) 
+    let rhs = fieldConvolution( xs , calculateWVec(D) )
+    check isEqualFrSeq( lhs , rhs )  
+
+  test "field convolution with WvecBar":
+    let xs  = randFrSeq( N )
+    let lhs = fieldConvolveWithWVecBar( D , xs ) 
+    let rhs = fieldConvolution( xs , calculateWVecBar(D) )
+    check isEqualFrSeq( lhs , rhs )  
+
+  test "group convolution with Wvec":
+    let gs  = randG1Seq( N )
+    let lhs = groupConvolveWithWVec( D , gs ) 
+    let rhs = groupConvolution( calculateWVec(D) , gs )
+    check isEqualG1Seq( lhs , rhs )  
+
+  test "group convolution with WvecBar":
+    let gs  = randG1Seq( N )
+    let lhs = groupConvolveWithWVecBar( D , gs ) 
+    let rhs = groupConvolution( calculateWVecBar(D) , gs )
+    check isEqualG1Seq( lhs , rhs )  
 
   test "expansion of the product of Lagrange polynomials":
     var ok = true

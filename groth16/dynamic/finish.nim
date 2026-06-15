@@ -47,17 +47,9 @@ func crossTermCoeffs*(D: Domain, As: seq[F], Bs: seq[F]) : seq[F] =
 
   let ABs = pointwiseProdFr( As, Bs )
 
-  var Ahat  = forwardNTT( As  , D )
-  var Bhat  = forwardNTT( Bs  , D )
-  var ABhat = forwardNTT( ABs , D )
-
-  inplaceMulByFFTofWVecBar( Ahat  )
-  inplaceMulByFFTofWVecBar( Bhat  )
-  inplaceMulByFFTofWVecBar( ABhat )
-
-  let Aconv  = inverseNTT( Ahat  , D)
-  let Bconv  = inverseNTT( Bhat  , D)
-  let ABconv = inverseNTT( ABhat , D)
+  let Aconv  = fieldConvolveWithWVecBar( D , As  )
+  let Bconv  = fieldConvolveWithWVecBar( D , Bs  )
+  let ABconv = fieldConvolveWithWVecBar( D , ABs )
 
   let sumW = sumOfWVec( N )
 

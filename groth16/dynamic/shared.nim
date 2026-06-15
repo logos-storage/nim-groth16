@@ -8,6 +8,8 @@ import groth16/bn128
 import groth16/bn128/arrays
 
 import groth16/math/domain
+import groth16/math/ntt
+import groth16/math/group_fft
 import groth16/math/poly
 #import groth16/math/convolution
 
@@ -79,6 +81,51 @@ proc inplaceMulByFFTofWVecBar*( xs: var seq[F] ) =
     let i = (if k==0: 0 else: N-k)
     let u = c + intToFr(i) * invN
     xs[k] *= u
+
+#---------------------------------------
+
+# pointwise multiply group elements by `FFT[W]_k = (k + (1-N)/2) / N`
+proc inplaceScalarMulByFFTofWVec*( gs: var seq[G1] ) = 
+  let N    = gs.len
+  let fN   = intToFr( N )
+  let invN = invFr(  fN )
+  let c    = divBy2Fr(oneFr - fN) * invN
+  for k in 0..<N:
+    let u = c + intToFr(k) * invN
+    gs[k] = u ** gs[k]
+
+# pointwise multiply group elements by `FFT[Wbar]_k = Bar[FFT[W]]_k`
+proc inplaceScalarMulByFFTofWVecBar*( gs: var seq[G1] ) = 
+  let N    = gs.len
+  let fN   = intToFr( N )
+  let invN = invFr(  fN )
+  let c    = divBy2Fr(oneFr - fN) * invN
+  for k in 0..<N:
+    let i = (if k==0: 0 else: N-k)
+    let u = c + intToFr(i) * invN
+    gs[k] = u ** gs[k]
+
+#---------------------------------------
+
+proc fieldConvolveWithWVec*( D: Domain, xs: seq[F] ): seq[F] =
+  var xsHat = forwardNTT( xs , D )
+  inplaceMulByFFTofWVec( xsHat )
+  return inverseNTT( xsHat , D)
+
+proc fieldConvolveWithWVecBar*( D: Domain, xs: seq[F] ): seq[F] =
+  var xsHat = forwardNTT( xs , D )
+  inplaceMulByFFTofWVecBar( xsHat )
+  return inverseNTT( xsHat , D)
+
+proc groupConvolveWithWVec*( D: Domain, gs: seq[G1] ): seq[G1] =
+  var gsHat = forwardGroupFFT( gs , D )
+  inplaceScalarMulByFFTofWVec( gsHat )
+  return inverseGroupFFT( gsHat , D)
+
+proc groupConvolveWithWVecBar*( D: Domain, gs: seq[G1] ): seq[G1] =
+  var gsHat = forwardGroupFFT( gs , D )
+  inplaceScalarMulByFFTofWVecBar( gsHat )
+  return inverseGroupFFT( gsHat , D)
 
 #-------------------------------------------------------------------------------
 

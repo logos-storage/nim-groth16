@@ -30,64 +30,25 @@ import groth16/dynamic/shared
 
 #-------------------------------------------------------------------------------
 
-# computes the vectors A*z, B*z (but skips C*z)
-func buildPartialAB*( zkey: ZKey, pwitness: seq[Option[Fr[BN254_Snarks]]] ): PartialAB =
-  let hdr: GrothHeader = zkey.header
-  let domSize = hdr.domainSize
-
-  var valuesAz = newSeq[Fr[BN254_Snarks]](domSize)
-  var valuesBz = newSeq[Fr[BN254_Snarks]](domSize)
- 
-  # we also compute the image of the complement of the partial witness under A and B
-  var complImageA = newSeq[bool](domSize) 
-  var complImageB = newSeq[bool](domSize) 
-  for i in 0..<domSize: 
-    complImageA[i] = false
-    complImageB[i] = false
-
-  for entry in zkey.coeffs:
-    case entry.matrix 
-
-      of MatrixA: 
-        if isSome(pwitness[entry.col]):
-          valuesAz[entry.row] += entry.coeff * pwitness[entry.col].unsafeGet()
-        else:
-          complImageA[entry.row] = true
-
-      of MatrixB: 
-        if isSome(pwitness[entry.col]):
-          valuesBz[entry.row] += entry.coeff * pwitness[entry.col].unsafeGet()
-        else:
-          complImageB[entry.row] = true
-
-      else: raise newException(AssertionDefect, "fatal error")
-
-  return PartialAB( valuesAz:valuesAz,
-                    valuesBz:valuesBz, 
-                    complImageA:complImageA,
-                    complImageB:complImageB )
-
-#-------------------------------------------------------------------------------
-
 func projectionElementsV1*(setup: DynaSetupV1, D: Domain, As: seq[F], complImage: seq[bool]): seq[G1] =
   let N = D.domainSize
   var Us: seq[G1] = newSeq[G1]( N )
 
-  # reverse indexed wvec: wvecBar[i] = wvec[-i]
-  let wvecBar: seq[F] = fftReverseVec( setup.weightVec )
+  # # reverse indexed wvec: wvecBar[i] = wvec[-i]
+  # let wvecBar: seq[F] = fftReverseVec( setup.weightVec )
 
-  let fldN    : F = intToFr( N ) 
-  let negSumW : F = (fldN - oneFr) / (fldN + fldN) 
+  let fldN : F = intToFr( N ) 
+  let sumW : F = sumOfWVec( N ) 
 
-  let WBarStarA : seq[F]  = fieldConvolution( As , wvecBar ) 
-  let ALstarW   : seq[G1] = groupConvolution( setup.weightVec , pointwiseScaleG1( As , setup.pointsDeltaLZ ) )
+  let WBarStarA : seq[F]  = fieldConvolveWithWVecBar( D , As ) 
+  let ALstarW   : seq[G1] = groupConvolveWithWVec( D , pointwiseScaleG1( As , setup.pointsDeltaLZ ) )
 
   # 2*d scalar multiplications + the group convolution above
   for k in 0..<N: 
  
     # we only compute for the _image of_ the complementer of the partial witness
     if complImage[k]:         
-      let cf : F = WBarStarA[k] - As[k] * negSumW
+      let cf : F = WBarStarA[k] - As[k] * sumW
       Us[k] = ALstarW[k] - (As[k] ** setup.wConvDeltaLZ[k]) + (cf ** setup.pointsDeltaLZ[k])
 
   return Us
