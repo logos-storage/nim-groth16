@@ -14,7 +14,6 @@ import constantine/named/properties_fields
 import groth16/bn128
 import groth16/math/domain
 import groth16/math/poly
-import groth16/math/matrix
 import groth16/zkey_types
 import groth16/files/witness
 import groth16/misc
@@ -27,7 +26,8 @@ import groth16/prover/shared
 # the finishing prover
 #
 
-proc finishPartialProofWithMask*( zkey: ZKey, wtns: Witness, partialProof: PartialProof, mask: Mask, pool: Taskpool, printTimings: bool): Proof =
+# you can turn on/off the computation of the nonlinear term (useful for the "dynark" version)
+proc finishPartialProofWithMaskGeneric*( nonlinear_term: bool, zkey: ZKey, wtns: Witness, partialProof: PartialProof, mask: Mask, pool: Taskpool, printTimings: bool): Proof =
 
   # if (zkey.header.curve != wtns.curve):
   #   echo( "zkey.header.curve = " & ($zkey.header.curve) )
@@ -87,22 +87,26 @@ proc finishPartialProofWithMask*( zkey: ZKey, wtns: Witness, partialProof: Parti
           k += 1
 
   var abc : ABC 
-  withMeasureTime(printTimings,"building 'ABC'"):
-    abc = buildABC( zkey, witness )
-
   var qs : seq[Fr[BN254_Snarks]]
-  withMeasureTime(printTimings,"computing the quotient (FFTs)"):
-    case zkey.header.flavour
+  if nonlinear_term:
 
-      # the points H are [delta^-1 * tau^i * Z(tau)]
-      of JensGroth:
-        let polyQ = computeQuotientPointwise( abc, pool )
-        qs = polyQ.coeffs
+    withMeasureTime(printTimings,"building 'ABC'"):
+      abc = buildABC( zkey, witness )
+
+    withMeasureTime(printTimings,"computing the quotient (FFTs)"):
+      case zkey.header.flavour
   
-      # the points H are `[delta^-1 * L_{2i+1}(tau)]_1`
-      # where L_i are Lagrange basis polynomials on the double-sized domain
-      of Snarkjs:
-        qs = computeSnarkjsScalarCoeffs( abc, pool )
+        # the points H are [delta^-1 * tau^i * Z(tau)]
+        of JensGroth:
+          let polyQ = computeQuotientPointwise( abc, pool )
+          qs = polyQ.coeffs
+    
+        # the points H are `[delta^-1 * L_{2i+1}(tau)]_1`
+        # where L_i are Lagrange basis polynomials on the double-sized domain
+        of Snarkjs:
+          qs = computeSnarkjsScalarCoeffs( abc, pool )
+
+    assert( hdr.domainSize    == qs.len           )
 
   # masking coeffs
   let r = mask.r
@@ -111,7 +115,6 @@ proc finishPartialProofWithMask*( zkey: ZKey, wtns: Witness, partialProof: Parti
   assert( witness.len == pts.pointsA1.len )
   assert( witness.len == pts.pointsB1.len )
   assert( witness.len == pts.pointsB2.len )
-  assert( hdr.domainSize    == qs.len           )
   assert( hdr.domainSize    == pts.pointsH1.len )
   assert( nvars - npubs - 1 == pts.pointsC1.len )
 
@@ -131,22 +134,28 @@ proc finishPartialProofWithMask*( zkey: ZKey, wtns: Witness, partialProof: Parti
     pi_b += msmMultiThreadedG2( compact_witness , compact_pointsB2, pool )
 
   var pi_c : G1 = partialProof.partial_pi_c
-  withMeasureTime(printTimings,"computing pi_C (2x G1 MSM)"):
+  withMeasureTime(printTimings,"computing pi_C linear part (G1 MSM)"):
     pi_c += s ** pi_a
     pi_c += r ** rho
     pi_c += negFr(r*s) ** spec.delta1
-    pi_c += msmMultiThreadedG1( qs , pts.pointsH1, pool )
     pi_c += msmMultiThreadedG1( compact_zs , compact_pointsC1, pool )
+
+  withMeasureTime(printTimings,"computing pi_C nonlinear part (large G1 MSM)"):
+    if nonlinear_term:
+      pi_c += msmMultiThreadedG1( qs , pts.pointsH1, pool )
 
   return Proof( curve:"bn128", publicIO:pubIO, pi_a:pi_a, pi_b:pi_b, pi_c:pi_c )
 
 #-------------------------------------------------------------------------------
 
+proc finishPartialProofWithMask*( zkey: ZKey, wtns: Witness, partial: PartialProof, mask: Mask, pool: Taskpool, printTimings: bool): Proof =
+  return finishPartialProofWithMaskGeneric( true, zkey, wtns, partial, mask, pool, printTimings )
+
 proc finishPartialProofWithTrivialMask*( zkey: ZKey, wtns: Witness, partial: PartialProof, pool: Taskpool, printTimings: bool ): Proof =
   let mask = Mask( r: zeroFr , s: zeroFr )
   return finishPartialProofWithMask( zkey, wtns, partial, mask, pool, printTimings )
 
-proc finishPartialProof*( zkey: ZKey, wtns: Witness, partial: PartialProof, pool: Taskpool, printTimings = false ): Proof =
+proc finishPartialProof*( zkey: ZKey, wtns: Witness, partial: PartialProof, pool: Taskpool, printTimings = false): Proof =
   let mask = randomMask()
   return finishPartialProofWithMask( zkey, wtns, partial, mask, pool, printTimings )
 

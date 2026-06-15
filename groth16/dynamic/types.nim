@@ -29,9 +29,13 @@ type
 
 type 
 
+  DeltaImages* = object
+    imageA*  : seq[bool]          # image of the witness update space under A
+    imageB*  : seq[bool]          # image of the witness update space under B
+    imageAB* : seq[bool]          # union of the previous two
+
   # things we can compute at circuit setup time
   DynaSetupV1* = object
-    weightVec*     : seq[F]       # the weights `W_k = 1/N/(omega^-k - 1)`
     pointsDeltaLZ* : seq[G1]      # the points `delta^-1 * L_i(tau) * Z(tau) * g1` where `Z(x) = x^N-1`
     wConvDeltaLZ*  : seq[G1]      # the convolution of `W` and `pointsDeltaLZ`
 
@@ -41,8 +45,10 @@ type
     projB0*       : seq[G1]      # the same for B0
 
   DynaPreProofV1* = object
-    partialProof*   : PartialProof
-    dyanPreprocess* : DynaPreprocessV1
+    partialProof*   : PartialProof       # linear part of the partial proof
+    deltaImages*    : DeltaImages       # image of the witness delta under A and B (where can update happen)
+    dynaSetup*      : DynaSetupV1        # circuit-setup time calculations
+    dynaPreprocess* : DynaPreprocessV1   # "Dynark"-style preprocessing
 
   # this is used in the "cross-term"
   OnlyAB* = object

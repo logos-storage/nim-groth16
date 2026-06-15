@@ -4,6 +4,7 @@
 import constantine/named/properties_fields
 
 import groth16/bn128
+import groth16/bn128/debug
 
 #-------------------------------------------------------------------------------
 
@@ -27,6 +28,11 @@ func isEqualProof*(prf1, prf2: Proof): bool =
   return (prf1.pi_a === prf2.pi_a) and
          (prf1.pi_b === prf2.pi_b) and
          (prf1.pi_c === prf2.pi_c)
+
+proc debugPrintProof*(prf: Proof) =
+  debugPrintG1( "pi_A:" , prf.pi_a )
+  debugPrintG2( "pi_B:" , prf.pi_b )
+  debugPrintG1( "pi_C:" , prf.pi_c )
 
 #-------------------------------------------------------------------------------
 # Az, Bz, Cz column vectors

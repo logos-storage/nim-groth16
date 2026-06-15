@@ -4,12 +4,13 @@
 # import constantine/named/properties_fields
 
 import groth16/bn128
+import groth16/misc
 
 import groth16/math/domain
 import groth16/math/group_fft
 import groth16/math/poly
 import groth16/math/convolution
-# import groth16/math/convert
+import groth16/math/convert
 # import groth16/math/ntt
 
 import groth16/zkey_types
@@ -26,19 +27,29 @@ import groth16/dynamic/shared
 #-------------------------------------------------------------------------------
 
 # does the setup from the ZKey (prover key)
-func dynaSetupV1FromZKey*(zkey: Zkey): DynaSetupV1 = 
-
-  assert( zkey.header.flavour == JensGroth , "DynaSetupV1 requires classic (quotient) flavour, not Jordi's one!" )
+proc dynaSetupV1FromZKey*(zkey: Zkey): DynaSetupV1 = 
 
   let N = zkey.header.domainSize
   let D = createDomain(N)
+
+  # assert( zkey.header.flavour == JensGroth , "DynaSetupV1 requires classic (quotient) flavour, not Jordi's one!" )
+
+  var deltaZTau : seq[G1]                     # the points `delta^-1 * (tau^N-1) * tau^i * g1`
+  case zkey.header.flavour     
+
+    of JensGroth:
+      deltaZTau = zkey.pPoints.pointsH1
+
+    of Snarkjs:
+      echo "Jordi-style .zkey detected; converting points! (slow...)"
+      withMeasureTime(true,"Jordi-to-Jens conversion"):
+        deltaZTau = convertPointsFromJordi(D , zkey.pPoints.pointsH1)
   
-  let deltaLZ = inverseGroupFFT( zkey.pPoints.pointsH1 , D )
   let wvec    = calculateWVec( D )
+  let deltaLZ = inverseGroupFFT( deltaZTau , D )
   let conv    = groupConvolution( wvec , deltaLZ )
 
   return DynaSetupV1( pointsDeltaLZ : deltaLZ , 
-                      weightVec     : wvec    ,
                       wConvDeltaLZ  : conv    )
 
 #---------------------------------------
@@ -60,8 +71,7 @@ func simulateDynaSetupV1*( D: Domain, tau: F, delta: F ): DynaSetupV1 =
   let wvec   = calculateWVec( D )
   let conv   = groupConvolution( wvec , deltaLZ )
 
-  return DynaSetupV1( weightVec     : wvec    ,
-                      pointsDeltaLZ : deltaLZ , 
+  return DynaSetupV1( pointsDeltaLZ : deltaLZ , 
                       wConvDeltaLZ  : conv    )
 
 #-------------------------------------------------------------------------------

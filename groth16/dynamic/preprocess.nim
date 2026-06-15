@@ -12,11 +12,14 @@
 
 import std/options
 
+import taskpools
+
 import constantine/math/arithmetic
 import constantine/named/properties_fields
 
 import groth16/bn128
 import groth16/bn128/arrays
+import groth16/misc
 
 import groth16/zkey_types
 
@@ -24,9 +27,13 @@ import groth16/math/domain
 import groth16/math/convolution
 import groth16/math/poly
 
+import groth16/partial/precalc
+
 import groth16/dynamic/types
 import groth16/dynamic/setup
 import groth16/dynamic/shared
+import groth16/dynamic/finish
+
 
 #-------------------------------------------------------------------------------
 
@@ -51,7 +58,7 @@ func projectionElementsV1*(setup: DynaSetupV1, D: Domain, As: seq[F], complImage
       let cf : F = WBarStarA[k] - As[k] * sumW
       Us[k] = ALstarW[k] - (As[k] ** setup.wConvDeltaLZ[k]) + (cf ** setup.pointsDeltaLZ[k])
 
-  return Us
+  return selectTrues( complImage , Us )
 
 #---------------------------------------
 
@@ -64,8 +71,8 @@ func simulateProjectionElementsV1*( D: Domain, tau: F, delta: F, As: seq[F], com
 
   let deltaInv : F = invFr(delta)
 
-  # reverse indexed wvec: wvecBar[i] = wvec[-i]
-  let wvecBar: seq[F] = fftReverseVec( setup.weightVec )
+  # # reverse indexed wvec: wvecBar[i] = wvec[-i]
+  # let wvecBar: seq[F] = fftReverseVec( calculateWVec( D ) )
 
   # sum_i A[i]*L_i(tau)
   var asLTau: F = zeroFr
@@ -94,7 +101,7 @@ func simulateProjectionElementsV1*( D: Domain, tau: F, delta: F, As: seq[F], com
       let corr   : F = deltaInv * As[k] * Lk_tau
       Us[k] = (y - corr) ** gen1
  
-  return Us
+  return selectTrues( complImage , Us )
 
 #---------------------------------------
 
@@ -115,22 +122,53 @@ proc testProjectionElementsV1*(N: int, tau: F, delta: F ): bool =
 
 #---------------------------------------
 
-func dynaPreprocessV1*(zkey: ZKey, setup: DynaSetupV1, partialWitness: PartialWitness): DynaPreprocessV1 =
+func dynaPreprocessV1*(zkey: ZKey, setup: DynaSetupV1, partialAB: PartialAB): DynaPreprocessV1 =
   let N = zkey.header.domainSize
   let D = createDomain(N)
 
-  # let wtnsMask = partialWitnessMask(partialWitness)
-
-  let partialAB = buildPartialAB( zkey, partialWitness.values )
-
-  let projA = projectionElementsV1( setup , D , partialAB.valuesAz , partialAB.complImageA )
-  let projB = projectionElementsV1( setup , D , partialAB.valuesBz , partialAB.complImageB )
+  # note: as we want to compute A0(x)*B'(x), the image masks should be the other ones!!
+  let projA = projectionElementsV1( setup , D , partialAB.valuesAz , partialAB.complImageB )
+  let projB = projectionElementsV1( setup , D , partialAB.valuesBz , partialAB.complImageA )
   
   return DynaPreprocessV1( projA0: projA, projB0: projB )
 
 #-------------------------------------------------------------------------------
 
+proc dynaPreProofV1*(zkey: ZKey, setup: DynaSetupV1, partialWitness: PartialWitness, pool: Taskpool, printTimings: bool): DynaPreProofV1 =
 
+  let N = zkey.header.domainSize
+  let D = createDomain(N)
+
+  var partialAB : PartialAB
+  withMeasureTime(printTimings,"build partial AB"):
+    partialAB = buildPartialAB( zkey, partialWitness.values )
+ 
+  let imageAB = orBoolSeqs( partialAB.complImageA , partialAB.complImageB )
+  let deltaImages = DeltaImages( imageA  : partialAB.complImageA ,
+                                 imageB  : partialAB.complImageB ,
+                                 imageAB : imageAB               )
+
+  var partialProof : PartialProof
+  withMeasureTime(printTimings,"precomputing the linear terms"):
+    partialProof = generatePartialProof( zkey, partialWitness, pool, false )
+
+  var nonlin: G1
+  withMeasureTime(printTimings,"precomputing the nonlinear term `A0(tau)*B0(tau)` "):
+    let cs = crossTermCoeffs(D , partialAB.valuesAz , partialAB.valuesBz )
+    nonlin = msmMultiThreadedG1( cs , setup.pointsDeltaLZ , pool )
+
+  partialProof.partial_pi_c += nonlin
+
+  var preprocess : DynaPreprocessV1
+  withMeasureTime(printTimings,"precomputing the \"projection\" points"):
+    preprocess = dynaPreprocessV1( zkey, setup, partialAB )
+
+  return DynaPreProofV1( partialProof   : partialProof ,
+                         deltaImages    : deltaImages  ,
+                         dynaSetup      : setup        ,
+                         dynaPreprocess : preprocess   )
+
+#-------------------------------------------------------------------------------
 
 
 

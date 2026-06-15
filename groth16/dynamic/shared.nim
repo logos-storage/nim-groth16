@@ -1,6 +1,8 @@
 
 import std/options
 
+import taskpools
+
 import constantine/math/arithmetic
 import constantine/named/properties_fields
 
@@ -138,20 +140,21 @@ func buildOnlyAB*( zkey: ZKey, pwitness: seq[Option[F]] ): OnlyAB =
   var valuesBz = newSeq[F](domSize)
  
   for entry in zkey.coeffs:
-    case entry.matrix 
+    if not isZeroFr(entry.coeff):
+      case entry.matrix 
+  
+        of MatrixA: 
+          if isSome(pwitness[entry.col]):
+            valuesAz[entry.row] += entry.coeff * pwitness[entry.col].unsafeGet()
+  
+        of MatrixB: 
+          if isSome(pwitness[entry.col]):
+            valuesBz[entry.row] += entry.coeff * pwitness[entry.col].unsafeGet()
+  
+        else: raise newException(AssertionDefect, "fatal error")
 
-      of MatrixA: 
-        if isSome(pwitness[entry.col]):
-          valuesAz[entry.row] += entry.coeff * pwitness[entry.col].unsafeGet()
-
-      of MatrixB: 
-        if isSome(pwitness[entry.col]):
-          valuesBz[entry.row] += entry.coeff * pwitness[entry.col].unsafeGet()
-
-      else: raise newException(AssertionDefect, "fatal error")
-
-  return OnlyAB( valuesAz:valuesAz ,
-                 valuesBz:valuesBz )
+  return OnlyAB( valuesAz: valuesAz ,
+                 valuesBz: valuesBz )
 
 #---------------------------------------
 
@@ -171,26 +174,27 @@ func buildPartialAB*( zkey: ZKey, pwitness: seq[Option[F]] ): PartialAB =
     complImageB[i] = false
 
   for entry in zkey.coeffs:
-    case entry.matrix 
+    if not isZeroFr(entry.coeff):
+      case entry.matrix 
+  
+        of MatrixA: 
+          if isSome(pwitness[entry.col]):
+            valuesAz[entry.row] += entry.coeff * pwitness[entry.col].unsafeGet()
+          else:
+            complImageA[entry.row] = true
+  
+        of MatrixB: 
+          if isSome(pwitness[entry.col]):
+            valuesBz[entry.row] += entry.coeff * pwitness[entry.col].unsafeGet()
+          else:
+            complImageB[entry.row] = true
+  
+        else: raise newException(AssertionDefect, "fatal error")
 
-      of MatrixA: 
-        if isSome(pwitness[entry.col]):
-          valuesAz[entry.row] += entry.coeff * pwitness[entry.col].unsafeGet()
-        else:
-          complImageA[entry.row] = true
-
-      of MatrixB: 
-        if isSome(pwitness[entry.col]):
-          valuesBz[entry.row] += entry.coeff * pwitness[entry.col].unsafeGet()
-        else:
-          complImageB[entry.row] = true
-
-      else: raise newException(AssertionDefect, "fatal error")
-
-  return PartialAB( valuesAz:valuesAz,
-                    valuesBz:valuesBz, 
-                    complImageA:complImageA,
-                    complImageB:complImageB )
+  return PartialAB( valuesAz: valuesAz,
+                    valuesBz: valuesBz, 
+                    complImageA: complImageA,
+                    complImageB: complImageB )
 
 #-------------------------------------------------------------------------------
 # the phi(x) polynomials and Lagrange product decomposition (for testing purposes)

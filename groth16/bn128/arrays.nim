@@ -55,7 +55,7 @@ func trueIndices*( bs: seq[bool] ): seq[int] =
       idxs[j] = i
       j += 1
   return idxs
-  
+
 func falseIndices*( bs: seq[bool] ): seq[int] =
   let k = countFalses(bs)
   var idxs: seq[int] = newSeq[int]( k )
@@ -65,6 +65,17 @@ func falseIndices*( bs: seq[bool] ): seq[int] =
       idxs[j] = i
       j += 1
   return idxs
+
+func selectTrues*[T]( bs: seq[bool] , xs: seq[T] ): seq[T] =
+  assert( bs.len == xs.len )
+  let k = countTrues(bs)
+  var ys: seq[T] = newSeq[T]( k )
+  var j = 0
+  for (i,b) in bs.pairs:
+    if b:
+      ys[j] = xs[i]
+      j += 1
+  return ys
 
 func notBoolSeq*( us: seq[bool]): seq[bool] =
   let n = us.len
@@ -137,6 +148,33 @@ func sumSeqFr*(xs : seq[Fr[BN254_Snarks]]): Fr[BN254_Snarks] =
   for i in 0..<n:
     s += xs[i]
   return s
+
+func countNonZerosFr*( xs: seq[Fr[BN254_Snarks]] ): int =
+  var cnt = 0 
+  for x in xs: 
+    if not isZeroFr(x): 
+      cnt += 1
+  return cnt
+
+# returns a mask and a filtered vector
+func selectNonZerosFr*( xs: seq[Fr[BN254_Snarks]] ): (seq[bool] , seq[Fr[BN254_Snarks]]) =
+  var cnt = 0 
+  var mask: seq[bool] = newSeq[bool]( xs.len ) 
+  for (i,x) in xs.pairs: 
+    if isZeroFr(x):
+      mask[i] = false
+    else:
+      mask[i] = true
+      cnt += 1
+
+  var k = 0
+  var short: seq[Fr[BN254_Snarks]] = newSeq[Fr[BN254_Snarks]]( cnt ) 
+  for (i,x) in xs.pairs: 
+    if mask[i]:
+      short[k] = x
+      k += 1
+
+  return (mask,short)
 
 #-------------------------------------------------------------------------------
 # G1 arrays
