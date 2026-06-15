@@ -14,6 +14,7 @@ import constantine/named/properties_fields
 import groth16/bn128
 import groth16/math/domain
 import groth16/math/poly
+import groth16/math/matrix
 import groth16/zkey_types
 import groth16/files/witness
 import groth16/misc

@@ -82,6 +82,21 @@ type
 
 #-------------------------------------------------------------------------------
 
+proc printWitnessConfig*(cfg: WitnessConfig) = 
+  echo "R1CS witness config:"
+  echo " - nWires  = " & $cfg.nWires  
+  echo " - nPubOut = " & $cfg.nPubOut 
+  echo " - nPubIn  = " & $cfg.nPubIn  
+  echo " - nPrivIn = " & $cfg.nPrivIn 
+  echo " - nLabels = " & $cfg.nLabels 
+
+proc printR1CSMetaData*(r1cs: R1CS) = 
+  printWitnessConfig(r1cs.cfg)
+  echo "nConstraints = " & $r1cs.nConstr
+  assert (r1cs.nConstr == r1cs.constraints.len)
+
+#-------------------------------------------------------------------------------
+
 proc parseSection1_header( stream: Stream, user: var R1CS, sectionLen: int ) =
   # echo "\nparsing r1cs header"
   

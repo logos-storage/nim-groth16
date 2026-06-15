@@ -30,6 +30,66 @@ func constSeq*[T]( N: int , y: T ): seq[T] =
   return xs
 
 #-------------------------------------------------------------------------------
+# bool arrays
+
+func countTrues*( bs: seq[bool] ): int =
+  var cnt = 0 
+  for b in bs: 
+    if b: 
+      cnt += 1
+  return cnt
+
+func countFalses*( bs: seq[bool] ): int =
+  var cnt = 0 
+  for b in bs: 
+    if not b: 
+      cnt += 1
+  return cnt
+
+func trueIndices*( bs: seq[bool] ): seq[int] =
+  let k = countTrues(bs)
+  var idxs: seq[int] = newSeq[int]( k )
+  var j = 0
+  for (i,b) in bs.pairs:
+    if b:
+      idxs[j] = i
+      j += 1
+  return idxs
+  
+func falseIndices*( bs: seq[bool] ): seq[int] =
+  let k = countFalses(bs)
+  var idxs: seq[int] = newSeq[int]( k )
+  var j = 0
+  for (i,b) in bs.pairs:
+    if not b:
+      idxs[j] = i
+      j += 1
+  return idxs
+
+func notBoolSeq*( us: seq[bool]): seq[bool] =
+  let n = us.len
+  var ws: seq[bool] = newSeq[bool]( n )
+  for i in 0..<n:
+    ws[i] = not us[i]
+  return ws
+
+func andBoolSeqs*( us: seq[bool] , vs: seq[bool]): seq[bool] =
+  let n = us.len
+  assert( n == vs.len )
+  var ws: seq[bool] = newSeq[bool]( n )
+  for i in 0..<n:
+    ws[i] = us[i] and vs[i]
+  return ws
+
+func orBoolSeqs*( us: seq[bool] , vs: seq[bool]): seq[bool] =
+  let n = us.len
+  assert( n == vs.len )
+  var ws: seq[bool] = newSeq[bool]( n )
+  for i in 0..<n:
+    ws[i] = us[i] or vs[i]
+  return ws
+
+#-------------------------------------------------------------------------------
 # Fr arrays
 
 proc randFrSeq*(N: int) : seq[Fr[BN254_Snarks]] = 

@@ -46,6 +46,10 @@ func ceilingLog2* (x : int) : int =
   else:
     return (floorLog2(x-1) + 1)
 
+func isPowerOfTwo*( N: int): bool =
+  let reN = (1 shl ceilingLog2(N))
+  return ( N == reN )
+
 #-------------------------------------------------------------------------------
 
 #[

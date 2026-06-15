@@ -18,15 +18,56 @@ import system
 import taskpools
 
 import groth16/bn128
+import groth16/bn128/arrays
 import groth16/zkey_types
 import groth16/misc
 
+import groth16/math/matrix
 import groth16/partial/types
 
 #import groth16/math/domain
 #import groth16/math/poly
 #import groth16/prover/shared
 
+#-------------------------------------------------------------------------------
+
+proc printPartialWitnessStats*(zkey: ZKey, pw: PartialWitness) = 
+  let n = zkey.header.domainSize
+  let m = zkey.header.nvars
+
+  echo ""
+  echo "N (domain)  = " & $n
+  echo "M (witness) = " & $m
+
+  let matrices = zkeyToSparseMatrices(zkey)
+  var partial_mask: seq[bool] = newSeq[bool] ( m )
+  var delta_mask:   seq[bool] = newSeq[bool] ( m )
+  for j in 0..<m:
+    partial_mask[j] = pw.values[j].isSome()
+    delta_mask[j]   = not partial_mask[j]
+
+  let partImgA   = sparseMatrixImage( matrices.A , partial_mask )
+  let partImgB   = sparseMatrixImage( matrices.B , partial_mask )
+
+  let deltaImgA  = sparseMatrixImage( matrices.A , delta_mask )
+  let deltaImgB  = sparseMatrixImage( matrices.B , delta_mask )
+  let deltaImgAB = orBoolSeqs( deltaImgA , deltaImgB )
+
+  let intersectA = andBoolSeqs( partImgA , deltaImgA )
+  let intersectB = andBoolSeqs( partImgB , deltaImgB )
+
+  echo ""
+  echo "A mtx partial witness image = " & $countTrues(partImgA  )
+  echo "A mtx delta image           = " & $countTrues(deltaImgA )
+  echo "A mtx images intersection   = " & $countTrues(intersectA)
+  echo ""
+  echo "B mtx partial witness image = " & $countTrues(partImgB  )
+  echo "B mtx delta image           = " & $countTrues(deltaImgB )
+  echo "B mtx images intersection   = " & $countTrues(intersectB)
+  echo ""
+  echo "union of A and B delta      = " & $countTrues(deltaImgAB)
+  echo ""
+  
 #-------------------------------------------------------------------------------
 # the prover
 #

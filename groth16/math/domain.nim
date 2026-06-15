@@ -14,12 +14,17 @@ import groth16/misc
 #-------------------------------------------------------------------------------
 
 type 
+
   Domain* = object
-    domainSize*    : int              # `N = 2^n`
-    logDomainSize* : int              # `n = log2(N)`
-    domainGen*     : Fr[BN254_Snarks] # `g`
-    invDomainGen*  : Fr[BN254_Snarks] # `g^-1`
-    invDomainSize* : Fr[BN254_Snarks] # `1/n`
+    domainSize*    : int                # `N = 2^n`
+    logDomainSize* : int                # `n = log2(N)`
+    domainGen*     : Fr[BN254_Snarks]   # `g`
+    invDomainGen*  : Fr[BN254_Snarks]   # `g^-1`
+    invDomainSize* : Fr[BN254_Snarks]   # `1/n`
+
+  Subgroup* = object
+    bigDomain*   : Domain
+    smallDomain* : Domain
 
 #-------------------------------------------------------------------------------
 
@@ -58,3 +63,14 @@ func enumerateDomain*(D: Domain): seq[Fr[BN254_Snarks]] =
 
 #-------------------------------------------------------------------------------
 
+func subgroupIndex*(sg: Subgroup): int = 
+  return (sg.bigDomain.domainSize div sg.smallDomain.domainSize)
+
+func createSubgroup*(D: Domain, K: int): Subgroup =
+  let N = D.domainSize
+  assert( K >= 1 )
+  assert( K <= N )
+  assert( (N mod K) == 0 )
+  return Subgroup( bigDomain: D, smallDomain: createDomain(K) )
+
+#-------------------------------------------------------------------------------

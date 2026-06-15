@@ -19,6 +19,12 @@ import groth16/dynamic/shared
 
 #-------------------------------------------------------------------------------
 
+#  let deltaImgA  = sparseMatrixImage( A , delta_mask )
+#  let deltaImgB  = sparseMatrixImage( B , delta_mask )
+#  let deltaImgAB = orBoolSeqs( deltaImgA , deltaImgB )
+
+#-------------------------------------------------------------------------------
+
 # does the setup from the ZKey (prover key)
 func dynaSetupV1FromZKey*(zkey: Zkey): DynaSetupV1 = 
 

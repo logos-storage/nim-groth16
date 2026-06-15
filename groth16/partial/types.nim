@@ -31,6 +31,7 @@ type
 func makePartialWitness*(vals: seq[Option[Fr[BN254_Snarks]]]): PartialWitness =
   return PartialWitness(values: vals)
 
+# true where it's filled
 func partialWitnessMask*(pw: PartialWitness): seq[bool] = 
   let N = pw.values.len
   var bs: seq[bool] = newSeq[bool]( N )
@@ -39,3 +40,4 @@ func partialWitnessMask*(pw: PartialWitness): seq[bool] =
   return bs 
 
 #-------------------------------------------------------------------------------
+
