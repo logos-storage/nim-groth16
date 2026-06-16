@@ -34,9 +34,9 @@ import groth16/prover/types
 import groth16/prover/shared
 import groth16/partial/finish
 
-import groth16/dynamic/types
-import groth16/dynamic/setup
 import groth16/dynamic/shared
+import groth16/dynamic/v1/types
+import groth16/dynamic/v1/setup
 
 #-------------------------------------------------------------------------------
 

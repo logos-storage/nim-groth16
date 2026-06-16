@@ -125,7 +125,7 @@ proc finishPartialProofWithMaskGeneric*( nonlinear_term: bool, zkey: ZKey, wtns:
 
   var rho : G1 = partialProof.partial_rho
   withMeasureTime(printTimings,"computing rho (G1 MSM)"):
-    rho += s ** spec.delta1
+    # rho += s ** spec.delta1
     rho += msmMultiThreadedG1( compact_witness , compact_pointsB1, pool )
 
   var pi_b : G2 = partialProof.partial_pi_b
@@ -137,7 +137,7 @@ proc finishPartialProofWithMaskGeneric*( nonlinear_term: bool, zkey: ZKey, wtns:
   withMeasureTime(printTimings,"computing pi_C linear part (G1 MSM)"):
     pi_c += s ** pi_a
     pi_c += r ** rho
-    pi_c += negFr(r*s) ** spec.delta1
+    # pi_c += negFr(r*s) ** spec.delta1
     pi_c += msmMultiThreadedG1( compact_zs , compact_pointsC1, pool )
 
   withMeasureTime(printTimings,"computing pi_C nonlinear part (large G1 MSM)"):

@@ -101,6 +101,16 @@ func orBoolSeqs*( us: seq[bool] , vs: seq[bool]): seq[bool] =
   return ws
 
 #-------------------------------------------------------------------------------
+# int arrays
+
+func sumIntSeq*(xs : seq[int]): int =
+  let n = xs.len
+  var s = 0
+  for i in 0..<n:
+    s += xs[i]
+  return s
+
+#-------------------------------------------------------------------------------
 # Fr arrays
 
 proc randFrSeq*(N: int) : seq[Fr[BN254_Snarks]] = 

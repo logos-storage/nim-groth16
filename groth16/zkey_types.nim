@@ -77,7 +77,7 @@ func extractVKey*(zkey: Zkey): VKey =
   return VKey(curve:curve, spec:spec, vpoints:vpts)
 
 #-------------------------------------------------------------------------------
-# extract the three matrices from the ZKey
+# extract the three matrices from the ZKey (TODO: C is actually not there...)
 
 func coeffsToSparseMatrices*( dims: MatrixDims, coeffs: seq[Coeff]): SparseMatrices = 
   var A: SparseMatrixColumns[Fr[BN254_Snarks]] = newSeq[SparseColumn[Fr[BN254_Snarks]]] ( dims.ncols )

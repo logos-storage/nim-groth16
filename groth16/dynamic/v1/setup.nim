@@ -18,8 +18,8 @@ import groth16/math/convert
 
 import groth16/zkey_types
 
-import groth16/dynamic/types
 import groth16/dynamic/shared
+import groth16/dynamic/v1/types
 
 #-------------------------------------------------------------------------------
 
