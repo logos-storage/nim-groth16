@@ -12,6 +12,7 @@
 #
 
 import std/options
+import std/sequtils
 
 import taskpools
 
@@ -40,8 +41,13 @@ import groth16/dynamic/v2/setup
 
 #-------------------------------------------------------------------------------
 
+type LinearPart = object
+  unfinished_proof : Proof     # pi_A and pi_B are done, but pi_C is still mostly empty
+  rho_coeffs       : seq[F]    # r * witness
+  rho_points       : seq[G1]   # just pointsB1
+
 # you can turn on/off the computation of the nonlinear term (useful for the "dynark" version)
-proc finishLinearTerms( zkey: ZKey, wtns: Witness, partialProof: PartialProof, mask: Mask, pool: Taskpool, printTimings: bool): Proof =
+proc finishLinearTerms( zkey: ZKey, wtns: Witness, partialProof: PartialProof, mask: Mask, pool: Taskpool, printTimings: bool): LinearPart =
 
   assert( zkey.header.curve == wtns.curve )
 
@@ -99,10 +105,9 @@ proc finishLinearTerms( zkey: ZKey, wtns: Witness, partialProof: PartialProof, m
     pi_a += r ** spec.delta1
     pi_a += msmMultiThreadedG1( compact_witness , compact_pointsA1, pool )
 
-  var rho : G1 = partialProof.partial_rho
-  withMeasureTime(printTimings,"computing rho (G1 MSM)"):
-    # rho += s ** spec.delta1
-    rho += msmMultiThreadedG1( compact_witness , compact_pointsB1, pool )
+  # var rho : G1 = partialProof.partial_rho
+  # withMeasureTime(printTimings,"computing rho (G1 MSM)"):
+  #   rho += msmMultiThreadedG1( compact_witness , compact_pointsB1, pool )
 
   var pi_b : G2 = partialProof.partial_pi_b
   withMeasureTime(printTimings,"computing pi_B (G2 MSM)"):
@@ -110,10 +115,18 @@ proc finishLinearTerms( zkey: ZKey, wtns: Witness, partialProof: PartialProof, m
     pi_b += msmMultiThreadedG2( compact_witness , compact_pointsB2, pool )
 
   var pi_c : G1 = partialProof.partial_pi_c
-  pi_c += s ** pi_a
-  pi_c += r ** rho
+  pi_c += s ** pi_a + r ** partialProof.partial_rho   
 
-  return Proof( curve:"bn128", publicIO:pubIO, pi_a:pi_a, pi_b:pi_b, pi_c:pi_c )
+  var rho_coeffs: seq[F] = newSeq[F]( count )
+  withMeasureTime(printTimings,"rho coefficients"):
+    for j in 0..<count:
+      rho_coeffs[j] = r * compact_witness[j]
+
+  let prf = Proof( curve:"bn128", publicIO:pubIO, pi_a:pi_a, pi_b:pi_b, pi_c:pi_c )
+
+  return LinearPart( unfinished_proof : prf              ,
+                     rho_coeffs       : rho_coeffs       ,
+                     rho_points       : compact_pointsB1 )
 
 #-------------------------------------------------------------------------------
 
@@ -138,11 +151,12 @@ proc finishDynaProofWithMaskV2*( zkey: ZKey, wtns: Witness, dynaPreProof: DynaPr
         witnessDelta[j] = some(wtns.values[j])
     deltaAB = buildOnlyAB( zkey , witnessDelta )
 
-  var proof: Proof
+  var linpart: LinearPart
   withMeasureTime(printTimings,"finishing the linear terms"):
-    proof = finishLinearTerms( zkey, wtns, dynaPreProof.partialProof, mask, pool, false )
+    linpart = finishLinearTerms( zkey, wtns, dynaPreProof.partialProof, mask, pool, true ) # false )
 
-  var nonlin: G1 = infG1
+  var proof  : Proof = linpart.unfinished_proof
+  var nonlin : G1    = infG1
 
 #[ 
 
@@ -161,21 +175,28 @@ proc finishDynaProofWithMaskV2*( zkey: ZKey, wtns: Witness, dynaPreProof: DynaPr
 
 ]#
 
+  var cross_cs: seq[F]
+  var cross_ps: seq[G1]
+
   # following the Dynark paper
   withMeasureTime(printTimings,"computing the nonlinear \"cross\" term (Dynark-style)"):
 
     let idxs = trueIndices( dynaPreProof.deltaImages.imageAB ) 
     let K = idxs.len
 
-    withMeasureTime(printTimings," - computing the diagonal part of the cross-term"):
+    withMeasureTime(false," - computing the diagonal part of the cross-term"):
       var cs: seq[F]  = newSeq[F ]( K )
       var ps: seq[G1] = newSeq[G1]( K )
       for (k,i) in idxs.pairs:
         cs[k] = deltaAB.valuesAz[i] * deltaAB.valuesBz[i] 
         ps[k] = dynaPreProof.dynaSetup.diagPhiPoints[i]
-      nonlin += msmMultiThreadedG1( cs , ps , pool ) 
 
-    withMeasureTime(printTimings," - computing the off-diagonal part of the cross-term"):
+      # nonlin += msmMultiThreadedG1( cs , ps , pool ) 
+
+      cross_cs = cs
+      cross_ps = ps
+
+    withMeasureTime(false," - computing the off-diagonal part of the cross-term"):
       let As = deltaAB.valuesAz 
       let Bs = deltaAB.valuesBz 
       let AstarW = fieldConvolution( As , wvecRev )
@@ -186,26 +207,21 @@ proc finishDynaProofWithMaskV2*( zkey: ZKey, wtns: Witness, dynaPreProof: DynaPr
         ds[k] = As[i] * BstarW[i] + Bs[i] * AstarW[i]    
 
       let ls = selectTrues( dynaPreProof.deltaImages.imageAB , dynaPreProof.dynaSetup.pointsDeltaLZ )
-      nonlin += msmMultiThreadedG1( ds , ls , pool ) 
 
-#[
-      var ds: seq[F]  = newSeq[F ]( K )
-      var qs: seq[G1] = newSeq[G1]( K )
-      for (k,i) in idxs.pairs:
-        var x: F = zeroFr
-        for j in idxs: 
-          if (i != j):
-            let ab = deltaAB.valuesAz[i] * deltaAB.valuesBz[j]  +
-                     deltaAB.valuesAz[j] * deltaAB.valuesBz[i]
-            x += ab * wvec[ safeMod( j - i , N ) ]
-        ds[k] = x
-        qs[k] = dynaPreProof.dynaSetup.pointsDeltaLZ[i]
-      nonlin += msmMultiThreadedG1( ds , qs , pool ) 
- ]#
+      # nonlin += msmMultiThreadedG1( ds , ls , pool ) 
 
-  withMeasureTime(printTimings,"computing the nonlinear \"projection\" terms"):
-    let zs = selectFalses( partialMask , wtns.values )
-    nonlin += msmMultiThreadedG1( zs , dynaPreProof.dynaPreprocess.unified , pool)
+      cross_cs = concat( cross_cs , ds )
+      cross_ps = concat( cross_ps , ls )
+
+  withMeasureTime(printTimings,"computing all the remaining MSMs in one go"):
+    var zs = selectFalses( partialMask , wtns.values )
+    var ps = dynaPreProof.dynaPreprocess.unified
+
+    # include the rho term too - one longer MSM is faster than two shorter
+    zs = concat( zs , linpart.rho_coeffs , cross_cs )
+    ps = concat( ps , linpart.rho_points , cross_ps )
+
+    nonlin += msmMultiThreadedG1( zs , ps , pool)
 
   proof.pi_c += nonlin
 
