@@ -41,9 +41,6 @@ func projectionElementsV1*(setup: DynaSetupV1, D: Domain, As: seq[F], complImage
   let N = D.domainSize
   var Us: seq[G1] = newSeq[G1]( N )
 
-  # # reverse indexed wvec: wvecBar[i] = wvec[-i]
-  # let wvecBar: seq[F] = fftReverseVec( setup.weightVec )
-
   let fldN : F = intToFr( N ) 
   let sumW : F = sumOfWVec( N ) 
 
@@ -66,13 +63,8 @@ func projectionElementsV1*(setup: DynaSetupV1, D: Domain, As: seq[F], complImage
 func simulateProjectionElementsV1*( D: Domain, tau: F, delta: F, As: seq[F], complImage: seq[bool] ): seq[G1] =
 
   let N = D.domainSize
- 
   let setup = simulateDynaSetupV1( D, tau, delta )
-
   let deltaInv : F = invFr(delta)
-
-  # # reverse indexed wvec: wvecBar[i] = wvec[-i]
-  # let wvecBar: seq[F] = fftReverseVec( calculateWVec( D ) )
 
   # sum_i A[i]*L_i(tau)
   var asLTau: F = zeroFr
@@ -138,31 +130,6 @@ proc dynaPreProofV1*(zkey: ZKey, setup: DynaSetupV1, partialWitness: PartialWitn
 
   let N = zkey.header.domainSize
   let D = createDomain(N)
-
-#[
-  import groth16/math/matrix  
-  import std/tables               # TODO: temporary!
-
-  # TODO: just tmp testing
-  let M = zkey.header.nvars
-  let matABC = zkeyToSparseMatrices(zkey)
-  let dmask = notBoolSeq( partialWitnessMask(partialWitness) )
-  let cntA = selectTrues( dmask , sparseMatrixColumnCounts(matABC.A) )
-  let cntB = selectTrues( dmask , sparseMatrixColumnCounts(matABC.B) )
-  # echo $cntA
-  # echo $cntB
-  echo $sumIntSeq(cntA)
-  echo $sumIntSeq(cntB)
-  echo $countTrues(dmask)
-  for j in 0..<M: 
-    if dmask[j]:
-      for (i,x) in matABC.A.columns[j].pairs:
-        echo toDecimalFr(x)
-  for j in 0..<M: 
-    if dmask[j]:
-      for (i,x) in matABC.B.columns[j].pairs:
-        echo toDecimalFr(x)
-]#
 
   var partialAB : PartialAB
   withMeasureTime(printTimings,"build partial AB"):

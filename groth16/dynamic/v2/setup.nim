@@ -19,12 +19,12 @@ import groth16/math/convert
 import groth16/zkey_types
 
 import groth16/dynamic/shared
-import groth16/dynamic/v1/types
+import groth16/dynamic/v2/types
 
 #-------------------------------------------------------------------------------
 
 # does the setup from the ZKey (prover key)
-proc dynaSetupV1FromZKey*(zkey: Zkey, pool: Taskpool ): DynaSetupV1 = 
+proc dynaSetupV2FromZKey*(zkey: Zkey, pool: Taskpool ): DynaSetupV2 = 
 
   let N = zkey.header.domainSize
   let D = createDomain(N)
@@ -49,7 +49,7 @@ proc dynaSetupV1FromZKey*(zkey: Zkey, pool: Taskpool ): DynaSetupV1 =
   withMeasureTime(true,"phi diagonal took"):
     diagPhi = calculateDiagPhiFFT( wvec , deltaLZ )
 
-  return DynaSetupV1( weightVec     : wvec    ,
+  return DynaSetupV2( weightVec     : wvec    ,
                       pointsDeltaLZ : deltaLZ , 
                       wConvDeltaLZ  : conv    ,
                       diagPhiPoints : diagPhi )
@@ -58,7 +58,7 @@ proc dynaSetupV1FromZKey*(zkey: Zkey, pool: Taskpool ): DynaSetupV1 =
 
 # simulates a setup (from the "toxic waste" values `tau` and `delta`), so that 
 # we can test components of the system
-func simulateDynaSetupV1*( D: Domain, tau: F, delta: F ): DynaSetupV1 = 
+func simulateDynaSetupV2*( D: Domain, tau: F, delta: F ): DynaSetupV2 = 
 
   let N = D.domainSize
   let ztau:      F = smallPowFr(tau,N) - oneFr
@@ -74,7 +74,7 @@ func simulateDynaSetupV1*( D: Domain, tau: F, delta: F ): DynaSetupV1 =
   let conv    = groupConvolution(    wvec , deltaLZ )
   let diagPhi = calculateDiagPhiFFT( wvec , deltaLZ )
 
-  return DynaSetupV1( weightVec     : wvec    ,
+  return DynaSetupV2( weightVec     : wvec    ,
                       pointsDeltaLZ : deltaLZ , 
                       wConvDeltaLZ  : conv    ,
                       diagPhiPoints : diagPhi )

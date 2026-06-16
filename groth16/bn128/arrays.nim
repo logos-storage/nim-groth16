@@ -77,6 +77,17 @@ func selectTrues*[T]( bs: seq[bool] , xs: seq[T] ): seq[T] =
       j += 1
   return ys
 
+func selectFalses*[T]( bs: seq[bool] , xs: seq[T] ): seq[T] =
+  assert( bs.len == xs.len )
+  let k = countFalses(bs)
+  var ys: seq[T] = newSeq[T]( k )
+  var j = 0
+  for (i,b) in bs.pairs:
+    if not b:
+      ys[j] = xs[i]
+      j += 1
+  return ys
+
 func notBoolSeq*( us: seq[bool]): seq[bool] =
   let n = us.len
   var ws: seq[bool] = newSeq[bool]( n )

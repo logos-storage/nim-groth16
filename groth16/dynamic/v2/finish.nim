@@ -2,7 +2,13 @@
 #
 # Finishing a Dynark-style proof
 #
-# This version more-or-less follows the Dynark paper
+# We are implementing the cross-term differently from the paper:
+# 
+# - in the paper there are only two convolutions (4 field FFT-s), but 2 MSM-s
+# - we have three convolutions (6 field FFT-s), but only 1 MSM. 
+#
+# In practice our version is significantly faster, as MSM-s are much more expensive
+# than field FFTs (at least for practical sizes)
 #
 
 import std/options
@@ -29,12 +35,12 @@ import groth16/prover/shared
 import groth16/partial/finish
 
 import groth16/dynamic/shared
-import groth16/dynamic/v1/types
-import groth16/dynamic/v1/setup
+import groth16/dynamic/v2/types
+import groth16/dynamic/v2/setup
 
 #-------------------------------------------------------------------------------
 
-proc finishDynaProofWithMaskV1*( zkey: ZKey, wtns: Witness, dynaPreProof: DynaPreProofV1, mask: Mask, pool: Taskpool, printTimings: bool): Proof =
+proc finishDynaProofWithMaskV2*( zkey: ZKey, wtns: Witness, dynaPreProof: DynaPreProofV2, mask: Mask, pool: Taskpool, printTimings: bool): Proof =
 
   let N = zkey.header.domainSize
   let M = zkey.header.nvars
@@ -60,6 +66,23 @@ proc finishDynaProofWithMaskV1*( zkey: ZKey, wtns: Witness, dynaPreProof: DynaPr
     proof = finishPartialProofWithMaskGeneric( false, zkey, wtns, dynaPreProof.partialProof, mask, pool, false )
 
   var nonlin: G1 = infG1
+
+#[ 
+
+  --- this only makes sense if we can restrict to a subgroup ---
+  
+  var cs: seq[F]
+  withMeasureTime(printTimings,"computing the nonlinear \"cross\" term"):
+    withMeasureTime(printTimings," - computing the cross coeffs took"):
+      cs = crossTermCoeffs(D , deltaAB.valuesAz , deltaAB.valuesBz )
+    withMeasureTime(printTimings," - computing the cross MSM took"):
+      nonlin = msmMultiThreadedG1( cs , dynaPreProof.dynaSetup.pointsDeltaLZ , pool )
+  
+  echo " - nonzero coefficients in deltaA = " & $countNonZerosFr(deltaAB.valuesAz)
+  echo " - nonzero coefficients in deltaB = " & $countNonZerosFr(deltaAB.valuesBz)
+  echo " - nonzero coefficients in the cross-term = " & $countNonZerosFr(cs)
+
+]#
 
   # following the Dynark paper
   withMeasureTime(printTimings,"computing the nonlinear \"cross\" term (Dynark-style)"):
@@ -88,24 +111,31 @@ proc finishDynaProofWithMaskV1*( zkey: ZKey, wtns: Witness, dynaPreProof: DynaPr
       let ls = selectTrues( dynaPreProof.deltaImages.imageAB , dynaPreProof.dynaSetup.pointsDeltaLZ )
       nonlin += msmMultiThreadedG1( ds , ls , pool ) 
 
+#[
+      var ds: seq[F]  = newSeq[F ]( K )
+      var qs: seq[G1] = newSeq[G1]( K )
+      for (k,i) in idxs.pairs:
+        var x: F = zeroFr
+        for j in idxs: 
+          if (i != j):
+            let ab = deltaAB.valuesAz[i] * deltaAB.valuesBz[j]  +
+                     deltaAB.valuesAz[j] * deltaAB.valuesBz[i]
+            x += ab * wvec[ safeMod( j - i , N ) ]
+        ds[k] = x
+        qs[k] = dynaPreProof.dynaSetup.pointsDeltaLZ[i]
+      nonlin += msmMultiThreadedG1( ds , qs , pool ) 
+ ]#
+
   withMeasureTime(printTimings,"computing the nonlinear \"projection\" terms"):
-    let comprAz = selectTrues( dynaPreProof.deltaImages.imageA , deltaAB.valuesAz )
-    let comprBz = selectTrues( dynaPreProof.deltaImages.imageB , deltaAB.valuesBz )
-
-    # echo "comprAz.len = " & $comprAz.len
-    # echo "comprBz.len = " & $comprBz.len
-    # echo "projBA.len = " & $dynaPreProof.dynaPreprocess.projA0.len
-    # echo "projB0.len = " & $dynaPreProof.dynaPreprocess.projB0.len
-
-    nonlin += msmMultiThreadedG1( comprAz , dynaPreProof.dynaPreprocess.projB0 , pool ) 
-    nonlin += msmMultiThreadedG1( comprBz , dynaPreProof.dynaPreprocess.projA0 , pool ) 
+    let zs = selectFalses( partialMask , wtns.values )
+    nonlin += msmMultiThreadedG1( zs , dynaPreProof.dynaPreprocess.unified , pool)
 
   proof.pi_c += nonlin
 
   return proof
 
-proc finishDynaProofV1*( zkey: ZKey, wtns: Witness, dynaPreProof: DynaPreProofV1 , pool: Taskpool, printTimings = false ): Proof =
+proc finishDynaProofV2*( zkey: ZKey, wtns: Witness, dynaPreProof: DynaPreProofV2 , pool: Taskpool, printTimings = false ): Proof =
   let mask = randomMask()
-  return finishDynaProofWithMaskV1( zkey, wtns, dynaPreProof, mask, pool, printTimings )
+  return finishDynaProofWithMaskV2( zkey, wtns, dynaPreProof, mask, pool, printTimings )
 
 #-------------------------------------------------------------------------------

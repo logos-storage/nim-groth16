@@ -11,4 +11,11 @@ See also [this write-up](https://hackmd.io/@bkomuves/HyBL5V5xMe) (mostly followi
 Here some details are different from the paper though, and our implementation 
 is noticeably more efficient in practice.
 
+### Different versions
 
+We provide several slightly different versions with different tradeoffs
+
+- `dynamic/v1`: This is a version mostly following the Dynark paper (TODO: sparse convolution algorithm)
+- `dyanmic/v2`: This introduces some of our optimizations: 
+     - the projection term updates become essentially free
+     - we reorder the circuit so that the changes are in a subgroup (TODO)
