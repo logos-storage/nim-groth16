@@ -3,6 +3,8 @@
 # Number-theoretic transform 
 # (that is, FFT for polynomials over finite fields)
 #
+# TODO: flip the order of arguments, so that the domain is first...
+#
 
 #-------------------------------------------------------------------------------
 

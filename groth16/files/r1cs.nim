@@ -19,11 +19,11 @@
 #   nPubIn  : word32    = number of public inputs
 #   nPrivIn : word32    = number of private inputs
 #   nLabels : word64    = number of labels (variable names in the circom source code)
+#   nConstr : word32    = number of constraints
 #
 # 2: Constraints
 # --------------
-#   nConstr : word32    = number of constraints
-#   then an array of constraints:
+#   An array of constraints:
 #     A : LinComb
 #     B : LinComb
 #     C : LinComb
@@ -188,5 +188,85 @@ proc parseR1CS* (fname: string): R1CS =
   parseContainer( "r1cs", 1, fname, r1cs, r1csCallback, proc (id: int): bool = id == 1 )
   parseContainer( "r1cs", 1, fname, r1cs, r1csCallback, proc (id: int): bool = id != 1 )
   return r1cs
+
+#-------------------------------------------------------------------------------
+# writing R1CS files (required for reordering the rows)
+
+proc writeWitnessConfig(stream: Stream, cfg: WitnessConfig ) =
+  write[uint32]( stream , cfg.nWires.uint32  )       # total number of wires (or witness variables)
+  write[uint32]( stream , cfg.nPubOut.uint32 )       # number of public outputs
+  write[uint32]( stream , cfg.nPubIn.uint32  )       # number of public inputs
+  write[uint32]( stream , cfg.nPrivIn.uint32 )       # number of private inputs
+  write[uint64]( stream , cfg.nLabels.uint32 )       # number of labels
+
+proc writeR1CSHeader(stream: Stream, r1cs: R1CS ) =
+  write[uint32](      stream , 32       )            # n8r
+  write(              stream , r1cs.r   )            # the value of r
+  writeWitnessConfig( stream , r1cs.cfg )            # witness config
+  write[uint32]( stream , r1cs.nConstr.uint32 )      # number of constraints
+
+proc r1csHeaderSection*(r1cs: R1CS): seq[byte] = 
+  var stream = newStringStream()
+  stream.writeR1CSHeader(r1cs)
+  stream.flush()
+  stream.setPosition(0)
+  let bytes = cast[seq[byte]](stream.readAll())      # WTF nim  
+  stream.close()
+  return bytes
+
+proc r1csWireToLabelSection*(r1cs: R1CS): seq[byte] = 
+  var stream = newStringStream()
+  for x in r1cs.wireToLabel:
+    write[uint64]( stream , x.uint64 )
+  stream.flush()
+  stream.setPosition(0)
+  let bytes = cast[seq[byte]](stream.readAll())      # WTF nim  
+  stream.close()
+  return bytes
+
+proc writeFr(stream: Stream, x: Fr[BN254_Snarks]) =
+  var big : BigInt[254]  # fucking constantine
+  big = x.toBig()
+  stream.write(big)
+
+proc writeTerm(stream: Stream, term: Term ) = 
+  write[uint32]( stream , term.wireIdx.uint32 )
+  writeFr( stream , term.value )
+
+proc writeLinComb(stream: Stream, lc: LinComb ) =
+  write[uint32]( stream , lc.len.uint32 )
+  for term in lc:
+    writeTerm(stream, term)
+
+proc writeConstraint(stream: Stream, con: Constraint ) =
+  writeLinComb( stream, con.A )
+  writeLinComb( stream, con.B )
+  writeLinComb( stream, con.C )
+
+proc r1csConstraintsSection*(r1cs: R1CS): seq[byte] = 
+  var stream = newStringStream()
+  for c in r1cs.constraints:
+    writeConstraint( stream, c )
+  stream.flush()
+  stream.setPosition(0)
+  let bytes = cast[seq[byte]](stream.readAll())      # WTF nim  
+  stream.close()
+  return bytes
+
+proc exportR1CS*(fname: string, r1cs: R1CS) =
+  let section1 = r1csHeaderSection(     r1cs)
+  let section2 = r1csConstraintsSection(r1cs)
+  let section3 = r1csWireToLabelSection(r1cs)
+  echo $section1.len
+  echo $section2.len
+  echo $section3.len
+  var stream = newFileStream(fname, fmWrite)
+  writeGlobalHeader(  stream , "r1cs" , 1 , 3 )
+  writeSection(       stream , 2 , section2 )
+  writeSection(       stream , 1 , section1 )
+  writeSection(       stream , 3 , section3 )
+  stream.flush()
+  stream.close()
+  echo "fuck"
 
 #-------------------------------------------------------------------------------

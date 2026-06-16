@@ -94,3 +94,18 @@ proc parseContainer*[T] ( expectedMagic: string
 
 #-------------------------------------------------------------------------------
 
+proc writeGlobalHeader*( stream: Stream, magic: string, version: int, nsections: int ) = 
+  write[uint32]( stream , magicWord(magic) )
+  write[uint32]( stream , version.uint32   )
+  write[uint32]( stream , nsections.uint32 )
+
+# WTF seriously...
+proc writeBytes*( stream: Stream, data: seq[byte] ) = 
+  stream.writeData( addr(data[0]), data.len )             
+
+proc writeSection*( stream: Stream, sectionId: int, sectionData: seq[byte] ) =
+  write[uint32]( stream , sectionId.uint32       )
+  write[uint64]( stream , sectionData.len.uint64 )
+  writeBytes( stream , sectionData )
+
+#-------------------------------------------------------------------------------
