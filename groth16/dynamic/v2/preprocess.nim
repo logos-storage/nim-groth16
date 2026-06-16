@@ -55,7 +55,7 @@ func projectionElementsV2*(setup: DynaSetupV2, D: Domain, As: seq[F], complImage
 
 #-------------------------------------------------------------------------------
 
-proc compactifyPointsC1( zkey: ZKey, partial_mask: seq[bool] ): seq[G1] =
+proc compactifyPointsC1*( zkey: ZKey, partial_mask: seq[bool] ): seq[G1] =
 
   let hdr  : GrothHeader  = zkey.header
   let spec : SpecPoints   = zkey.specPoints
@@ -169,7 +169,7 @@ proc dynaPreProofV2*(zkey: ZKey, setup: DynaSetupV2, partialWitness: PartialWitn
   partialProof.partial_pi_c += nonlin
 
   var preprocess : DynaPreprocessV2
-  withMeasureTime(printTimings,"precomputing the \"projection\" points"):
+  withMeasureTime(printTimings,"precomputing the \"projection\" and then the unified points"):
     preprocess = dynaPreprocessV2( zkey, setup, partialAB, partialMask, zdeltaMask )
 
   return DynaPreProofV2( partialProof   : partialProof ,

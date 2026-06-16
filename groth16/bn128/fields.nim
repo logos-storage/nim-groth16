@@ -8,8 +8,10 @@
 
 import sugar
 import std/bitops
+import std/options
 # import std/sequtils
 
+import constantine/platforms/abstractions
 import constantine/math/arithmetic
 import constantine/math/io/io_fields
 import constantine/math/io/io_bigints
@@ -18,7 +20,8 @@ import constantine/math/extension_fields/towers as ext
 
 #-------------------------------------------------------------------------------
 
-type B* = BigInt[256]
+type B*    = BigInt[256]
+type B254* = BigInt[254]       # some more recent constantine idiosyncrasies.....
 
 func mkFp2* (i: Fp[BN254_Snarks], u: Fp[BN254_Snarks]) : Fp2[BN254_Snarks] =
   let c : array[2, Fp[BN254_Snarks]] = [i,u]
@@ -28,6 +31,8 @@ func mkFp2* (i: Fp[BN254_Snarks], u: Fp[BN254_Snarks]) : Fp2[BN254_Snarks] =
 
 const primeR*  : B = fromHex( B, "0x30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000001", bigEndian )
 const primeP*  : B = fromHex( B, "0x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd47", bigEndian )
+
+const primeR_B254* : BigInt[254] = fromHex( BigInt[254] , "0x30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000001", bigEndian )
 
 #-------------------------------------------------------------------------------
 
@@ -55,6 +60,11 @@ func intToB*(a: uint): B =
   y.setUint(a)
   return y
 
+func intToB254*(a: uint): B254 =
+  var y : B254
+  y.setUint(a)
+  return y
+
 func intToFp*(a: int): Fp[BN254_Snarks] =
   var y : Fp[BN254_Snarks]
   y.fromInt(a)
@@ -64,6 +74,36 @@ func intToFr*(a: int): Fr[BN254_Snarks] =
   var y : Fr[BN254_Snarks]
   y.fromInt(a)
   return y
+
+# -- seriously... 
+# func frToB*(x: Fr[BN254_Snarks]) : B = 
+#   var b : B
+#   b.fromField(x)
+#   return b
+
+func frToB254*(x: Fr[BN254_Snarks]) : B254 = 
+  var b : BigInt[254]
+  b.fromField(x)
+  return b
+
+#-------------------------------------------------------------------------------
+
+# if the field element is a small number (either positive or negative!) then we return that
+# useful for printing equation coefficients
+#
+func mbIsSmallFr*(x: Fr[BN254_Snarks]): Option[int] =
+  let bpos  : B254 = frToB254(x)
+  let thres : B254 = intToB254(1000000000)
+  if bool(bpos < thres):
+    return some(bpos.limbs[0].int)
+  else:
+    var y = zeroFr
+    y -= x
+    let bneg : B254 = frToB254(y)
+    if bool(bneg < thres):
+      return some(-bneg.limbs[0].int)
+    else:
+      return none(int)
 
 #-------------------------------------------------------------------------------
 

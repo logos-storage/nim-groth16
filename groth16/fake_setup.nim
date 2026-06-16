@@ -59,8 +59,13 @@ func r1csToCoeffs*(r1cs: R1CS): seq[Coeff] =
       let c = Coeff(matrix:MatrixB, row:i, col:term.wireIdx, coeff:term.value)
       coeffs.add(c)
 
-  # Snarkjs adds some dummy coefficients to the matrix "A", for the public I/O
-  # Let's emulate that here
+  # Snarkjs adds some dummy coefficients to the matrix "A", for the public I/O (including the constant 1)
+  #
+  # This to stop a (nontrivial) malleability attack; see:
+  #
+  # <https://web.archive.org/web/20240320152158/https://geometry.xyz/notebook/groth16-malleability>
+  # 
+  # Let's emulate that here.
   for i in n..n+p:
     let c = Coeff(matrix:MatrixA, row:i, col:i-n, coeff:oneFr)
     coeffs.add(c)

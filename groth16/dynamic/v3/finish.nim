@@ -1,6 +1,14 @@
 
 #
-# Finishing a V2 proof
+# Finishing a V3e proof
+#
+# We are implementing the cross-term differently from the paper:
+# 
+# - in the paper there are only two convolutions (4 field FFT-s), but 2 MSM-s
+# - we have three field convolutions (6 field FFT-s), but only 1 MSM. 
+#
+# In practice our version is significantly faster, as MSM-s are much more expensive
+# than field FFTs (at least for practical sizes)
 #
 
 import std/options
@@ -28,8 +36,8 @@ import groth16/prover/shared
 import groth16/partial/finish
 
 import groth16/dynamic/shared
-import groth16/dynamic/v2/types
-import groth16/dynamic/v2/setup
+import groth16/dynamic/v3/types
+import groth16/dynamic/v3/setup
 
 #-------------------------------------------------------------------------------
 
@@ -122,16 +130,19 @@ proc finishLinearTerms( zkey: ZKey, wtns: Witness, partialProof: PartialProof, m
 
 #-------------------------------------------------------------------------------
 
-proc finishDynaProofWithMaskV2*( zkey: ZKey, wtns: Witness, dynaPreProof: DynaPreProofV2, mask: Mask, pool: Taskpool, printTimings: bool): Proof =
+proc finishDynaProofWithMaskV3*( zkey: ZKey, wtns: Witness, dynaPreProof: DynaPreProofV3, mask: Mask, pool: Taskpool, printTimings: bool): Proof =
 
-  let N = zkey.header.domainSize
-  let M = zkey.header.nvars
-  let D = createDomain( N )
+  let setup = dynaPreProof.dynaSetup
+  let sg = setup.imageSubgroup 
+  let N  = zkey.header.domainSize
+  let M  = zkey.header.nvars
+  let D  = sg.bigDomain
+  assert( N == D.domainSize )
 
   let partialMask = dynaPreProof.partialProof.partial_mask
 
-  let wvec    = dynaPreProof.dynaSetup.weightVec 
-  let wvecRev = fftReverseVec( wvec )
+  let wvec    = setup.weightVec 
+  # let wvecRev = fftReverseVec( wvec )
 
   var deltaAB: OnlyAB
   var witnessDelta: seq[Option[F]] = newSeq[Option[F]]( M )
@@ -150,62 +161,35 @@ proc finishDynaProofWithMaskV2*( zkey: ZKey, wtns: Witness, dynaPreProof: DynaPr
   var proof  : Proof = linpart.unfinished_proof
   var nonlin : G1    = infG1
 
-#[ 
-
-  --- this only makes sense if we can restrict to a subgroup ---
-  
-  var cs: seq[F]
-  withMeasureTime(printTimings,"computing the nonlinear \"cross\" term"):
-    withMeasureTime(printTimings," - computing the cross coeffs took"):
-      cs = crossTermCoeffs(D , deltaAB.valuesAz , deltaAB.valuesBz )
-    withMeasureTime(printTimings," - computing the cross MSM took"):
-      nonlin = msmMultiThreadedG1( cs , dynaPreProof.dynaSetup.pointsDeltaLZ , pool )
-  
-  echo " - nonzero coefficients in deltaA = " & $countNonZerosFr(deltaAB.valuesAz)
-  echo " - nonzero coefficients in deltaB = " & $countNonZerosFr(deltaAB.valuesBz)
-  echo " - nonzero coefficients in the cross-term = " & $countNonZerosFr(cs)
-
-]#
-
   var cross_cs: seq[F]
   var cross_ps: seq[G1]
 
-  # following the Dynark paper
-  withMeasureTime(printTimings,"computing the nonlinear \"cross\" term (Dynark-style)"):
+  # note: this version only really makes sense if we can restrict to a subgroup (?)
+  withMeasureTime(printTimings,"computing the nonlinear \"cross\" term (3 convolution 1 MSM style)"):
+    let miniD = sg.smallDomain
+    let K = miniD.domainSize
+    let ell = N div K
 
-    let idxs = trueIndices( dynaPreProof.deltaImages.imageAB ) 
-    let K = idxs.len
+    let miniAz = selectOnSubgroup( sg , deltaAB.valuesAz ) 
+    let miniBz = selectOnSubgroup( sg , deltaAB.valuesBz )
 
-    withMeasureTime(false," - computing the diagonal part of the cross-term"):
-      var cs: seq[F]  = newSeq[F ]( K )
-      var ps: seq[G1] = newSeq[G1]( K )
-      for (k,i) in idxs.pairs:
-        cs[k] = deltaAB.valuesAz[i] * deltaAB.valuesBz[i] 
-        ps[k] = dynaPreProof.dynaSetup.diagPhiPoints[i]
+    let cross_cs1 = crossTermCoeffsSubgroup( wvec , sg , miniAz , miniBz )
+    let cross_ps1 = selectOnSubgroup( sg , dynaPreProof.dynaSetup.pointsDeltaLZ )
 
-      # nonlin += msmMultiThreadedG1( cs , ps , pool ) 
+    let diagAB  = pointwiseProdFr( miniAz, miniBz )
+    let diagPts = setup.miniDiagPoints
 
-      cross_cs = cs
-      cross_ps = ps
+    cross_cs = concat( cross_cs1 , diagAB  )
+    cross_ps = concat( cross_ps1 , diagPts )
 
-    withMeasureTime(false," - computing the off-diagonal part of the cross-term"):
-      let As = deltaAB.valuesAz 
-      let Bs = deltaAB.valuesBz 
-      let AstarW = fieldConvolution( As , wvecRev )
-      let BstarW = fieldConvolution( Bs , wvecRev )     # TODO: make this sparse somehow??!
-
-      var ds: seq[F] = newSeq[F]( K )
-      for (k,i) in idxs.pairs:
-        ds[k] = As[i] * BstarW[i] + Bs[i] * AstarW[i]    
-
-      let ls = selectTrues( dynaPreProof.deltaImages.imageAB , dynaPreProof.dynaSetup.pointsDeltaLZ )
-
-      # nonlin += msmMultiThreadedG1( ds , ls , pool ) 
-
-      cross_cs = concat( cross_cs , ds )
-      cross_ps = concat( cross_ps , ls )
+#[
+    # full domain (for testing only!)
+    let cross_cs_full = crossTermCoeffs( D , deltaAB.valuesAz , deltaAB.valuesBz )
+    let cross_ps_full = dynaPreProof.dynaSetup.pointsDeltaLZ 
+]#
 
   withMeasureTime(printTimings,"computing all the remaining MSMs in one go"):
+    # unified projection terms
     var zs = selectFalses( partialMask , wtns.values )
     var ps = dynaPreProof.dynaPreprocess.unified
 
@@ -219,8 +203,8 @@ proc finishDynaProofWithMaskV2*( zkey: ZKey, wtns: Witness, dynaPreProof: DynaPr
 
   return proof
 
-proc finishDynaProofV2*( zkey: ZKey, wtns: Witness, dynaPreProof: DynaPreProofV2 , pool: Taskpool, printTimings = false ): Proof =
+proc finishDynaProofV3*( zkey: ZKey, wtns: Witness, dynaPreProof: DynaPreProofV3 , pool: Taskpool, printTimings = false ): Proof =
   let mask = randomMask()
-  return finishDynaProofWithMaskV2( zkey, wtns, dynaPreProof, mask, pool, printTimings )
+  return finishDynaProofWithMaskV3( zkey, wtns, dynaPreProof, mask, pool, printTimings )
 
 #-------------------------------------------------------------------------------

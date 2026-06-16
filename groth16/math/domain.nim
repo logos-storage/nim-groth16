@@ -73,4 +73,28 @@ func createSubgroup*(D: Domain, K: int): Subgroup =
   assert( (N mod K) == 0 )
   return Subgroup( bigDomain: D, smallDomain: createDomain(K) )
 
+func selectOnSubgroup*[T]( sg: Subgroup , xs: seq[T] ): seq[T] = 
+  let N = sg.bigDomain.domainSize
+  let K = sg.smallDomain.domainSize
+  assert( xs.len == N )
+  var ys : seq[T] = newSeq[T]( K )
+  let J = N div K
+  for i in 0..<K:
+    ys[i] = xs[i*J]
+  return ys
+
+func liesInSubgroup*( sg: Subgroup, mask: seq[bool] ): bool = 
+  let N = sg.bigDomain.domainSize
+  let K = sg.smallDomain.domainSize
+  let J = N div K
+
+  assert( N == mask.len )
+
+  var ok = true
+  for (i,b) in mask.pairs:
+    if b:
+      ok = ok and ((i mod J) == 0)
+
+  return ok
+
 #-------------------------------------------------------------------------------

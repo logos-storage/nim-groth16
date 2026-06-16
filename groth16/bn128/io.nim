@@ -2,6 +2,7 @@
 
 import std/strutils
 import std/streams
+import std/options
 
 import constantine/math/arithmetic
 import constantine/math/io/io_fields
@@ -36,6 +37,20 @@ func toDecimalFr*(a : Fr[BN254_Snarks]): string =
   s = s.strip( leading=true, trailing=false, chars={'0'} )
   if s.len == 0: s="0"
   return s
+
+#---------------------------------------
+
+# returns the sign and the absolute value separately
+func renderSignedFr*(x: Fr[BN254_Snarks]): (string,string) =
+  let mb = mbIsSmallFr(x)
+  if mb.isSome():
+    let small = mb.unsafeGet()
+    if small < 0:
+      return ("-",$(-small))
+    else:
+      return ("+",$small)
+  else:
+    return ("+",toDecimalFr(x))
 
 #---------------------------------------
 

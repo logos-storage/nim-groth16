@@ -124,13 +124,15 @@ func sumIntSeq*(xs : seq[int]): int =
 #-------------------------------------------------------------------------------
 # Fr arrays
 
-proc randFrSeq*(N: int) : seq[Fr[BN254_Snarks]] = 
-  var xs : seq[Fr[BN254_Snarks]] = newSeq[Fr[BN254_Snarks]]( N )
+type F = Fr[BN254_Snarks]
+
+proc randFrSeq*(N: int) : seq[F] = 
+  var xs : seq[F] = newSeq[F]( N )
   for i in 0..<N:
     xs[i] = randFr()
   return xs
 
-func isEqualFrSeq*(xs: seq[Fr[BN254_Snarks]], ys: seq[Fr[BN254_Snarks]]): bool =
+func isEqualFrSeq*(xs: seq[F], ys: seq[F]): bool =
   let N = xs.len
   let M = ys.len
 
@@ -142,35 +144,47 @@ func isEqualFrSeq*(xs: seq[Fr[BN254_Snarks]], ys: seq[Fr[BN254_Snarks]]): bool =
       ok = ok and (xs[i] === ys[i])
     return ok
 
-proc scaleFrSeqInPlace*(s: Fr[BN254_Snarks], arr: var seq[Fr[BN254_Snarks]] ) = 
+func nonZeroMaskFrSeq*(xs: seq[F] ): seq[bool] =
+  let N = xs.len
+  var mask : seq[bool] = newSeq[bool]( N )
+  for i in 0..<N:
+    mask[i] = not isZeroFr(xs[i])
+  return mask
+
+proc scaleFrSeqInPlace*(s: F, arr: var seq[F] ) = 
   let N = arr.len  
   for i in 0..<N:
     arr[i] *= s
 
-proc pointwiseProdFr*(xs: seq[Fr[BN254_Snarks]], ys: seq[Fr[BN254_Snarks]]): seq[Fr[BN254_Snarks]] =
+proc scaleFrSeq*(s: F, arr: seq[F] ): seq[F] = 
+  var t = arr
+  scaleFrSeqInPlace(s, t)
+  return t
+
+proc pointwiseProdFr*(xs: seq[F], ys: seq[F]): seq[F] =
   let N = xs.len
   assert( N == ys.len )
-  var zs : seq[Fr[BN254_Snarks]] = newSeq[Fr[BN254_Snarks]]( N )
+  var zs : seq[F] = newSeq[F]( N )
   for i in 0..<N:
     zs[i] = xs[i] * ys[i]
   return zs
 
-func dotProdFr*(xs, ys: seq[Fr[BN254_Snarks]]): Fr[BN254_Snarks] =
+func dotProdFr*(xs, ys: seq[F]): F =
   let n = xs.len
   assert( n == ys.len, "dotProdFr: incompatible vector lengths" )
-  var s : Fr[BN254_Snarks] = zeroFr
+  var s : F = zeroFr
   for i in 0..<n:
     s += xs[i] * ys[i]
   return s
 
-func sumSeqFr*(xs : seq[Fr[BN254_Snarks]]): Fr[BN254_Snarks] =
+func sumSeqFr*(xs : seq[F]): F =
   let n = xs.len
-  var s : Fr[BN254_Snarks] = zeroFr
+  var s : F = zeroFr
   for i in 0..<n:
     s += xs[i]
   return s
 
-func countNonZerosFr*( xs: seq[Fr[BN254_Snarks]] ): int =
+func countNonZerosFr*( xs: seq[F] ): int =
   var cnt = 0 
   for x in xs: 
     if not isZeroFr(x): 
@@ -178,7 +192,7 @@ func countNonZerosFr*( xs: seq[Fr[BN254_Snarks]] ): int =
   return cnt
 
 # returns a mask and a filtered vector
-func selectNonZerosFr*( xs: seq[Fr[BN254_Snarks]] ): (seq[bool] , seq[Fr[BN254_Snarks]]) =
+func selectNonZerosFr*( xs: seq[F] ): (seq[bool] , seq[F]) =
   var cnt = 0 
   var mask: seq[bool] = newSeq[bool]( xs.len ) 
   for (i,x) in xs.pairs: 
@@ -189,7 +203,7 @@ func selectNonZerosFr*( xs: seq[Fr[BN254_Snarks]] ): (seq[bool] , seq[Fr[BN254_S
       cnt += 1
 
   var k = 0
-  var short: seq[Fr[BN254_Snarks]] = newSeq[Fr[BN254_Snarks]]( cnt ) 
+  var short: seq[F] = newSeq[F]( cnt ) 
   for (i,x) in xs.pairs: 
     if mask[i]:
       short[k] = x
@@ -218,12 +232,12 @@ func isEqualG1Seq*(xs: seq[G1], ys: seq[G1] ): bool =
       ok = ok and (xs[i] === ys[i])
     return ok
 
-proc scaleG1SeqInPlace*(s: Fr[BN254_Snarks], arr: var seq[G1] ) = 
+proc scaleG1SeqInPlace*(s: F, arr: var seq[G1] ) = 
   let N = arr.len  
   for i in 0..<N:
     arr[i] = s ** arr[i]
 
-proc pointwiseScaleG1*(xs: seq[Fr[BN254_Snarks]], gs: seq[G1]): seq[G1] =
+proc pointwiseScaleG1*(xs: seq[F], gs: seq[G1]): seq[G1] =
   let N = xs.len
   assert( N == gs.len )
   var hs : seq[G1] = newSeq[G1]( N )

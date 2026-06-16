@@ -1,6 +1,9 @@
 
-import constantine/math/arithmetic
+
+import std/tables
+
 import constantine/named/properties_fields
+import constantine/math/arithmetic
 import constantine/math/extension_fields/towers
 
 import groth16/bn128
@@ -20,9 +23,9 @@ type
     p*             : BigInt[256]     # size of the base field
     r*             : BigInt[256]     # size of the scalar field
     nvars*         : int             # number of witness variables (including the constant 1)
-    npubs*         : int             # number of public input/outputs (excluding the constant 1)
+    npubs*         : int             # number of public input/outputs (**excluding** the constant 1)
     domainSize*    : int             # size of the domain (should be power of two)
-    logDomainSize* : int
+    logDomainSize* : int             # base 2 logarithm of the size of the domain
 
   SpecPoints* = object
     alpha1*      : G1                # = alpha * g1
@@ -77,12 +80,14 @@ func extractVKey*(zkey: Zkey): VKey =
   return VKey(curve:curve, spec:spec, vpoints:vpts)
 
 #-------------------------------------------------------------------------------
-# extract the three matrices from the ZKey (TODO: C is actually not there...)
+# extract the three matrices from the ZKey (TODO: C is actually not present there...)
+
+type F = Fr[BN254_Snarks]
 
 func coeffsToSparseMatrices*( dims: MatrixDims, coeffs: seq[Coeff]): SparseMatrices = 
-  var A: SparseMatrixColumns[Fr[BN254_Snarks]] = newSeq[SparseColumn[Fr[BN254_Snarks]]] ( dims.ncols )
-  var B: SparseMatrixColumns[Fr[BN254_Snarks]] = newSeq[SparseColumn[Fr[BN254_Snarks]]] ( dims.ncols )
-  var C: SparseMatrixColumns[Fr[BN254_Snarks]] = newSeq[SparseColumn[Fr[BN254_Snarks]]] ( dims.ncols )
+  var A: SparseMatrixColumns[F] = newSeq[SparseColumn[F]] ( dims.ncols )
+  var B: SparseMatrixColumns[F] = newSeq[SparseColumn[F]] ( dims.ncols )
+  var C: SparseMatrixColumns[F] = newSeq[SparseColumn[F]] ( dims.ncols )
  
   for cf in coeffs:
     case cf.matrix
@@ -90,14 +95,47 @@ func coeffsToSparseMatrices*( dims: MatrixDims, coeffs: seq[Coeff]): SparseMatri
       of MatrixB: columnInsertWithAddFr( B[cf.col] , cf.row , cf.coeff ) 
       of MatrixC: columnInsertWithAddFr( C[cf.col] , cf.row , cf.coeff )
  
-  let mA = SparseMatrix[Fr[BN254_Snarks]]( dims: dims , columns: A )
-  let mB = SparseMatrix[Fr[BN254_Snarks]]( dims: dims , columns: B )
-  let mC = SparseMatrix[Fr[BN254_Snarks]]( dims: dims , columns: C )
+  let mA = SparseMatrix[F]( dims: dims , columns: A )
+  let mB = SparseMatrix[F]( dims: dims , columns: B )
+  let mC = SparseMatrix[F]( dims: dims , columns: C )
   return SparseMatrices( A: mA, B: mB, C: mC )
 
 func zkeyToSparseMatrices*(zkey: ZKey): SparseMatrices = 
   let dims = MatrixDims( nrows: zkey.header.domainSize , ncols: zkey.header.nvars )
   return coeffsToSparseMatrices( dims , zkey.coeffs )
+
+#-------------------------------------------------------------------------------
+# useful for debugging
+
+func doesPublicIOAppears( npubs: int , row: SparseRow[F] , do_include_const1: bool ): bool =
+  var yes   = false
+  let start = (if do_include_const1: 0 else: 1)
+  for j in start..<npubs:
+    if row.contains(j):
+      yes = true
+      break
+  return yes
+
+proc zkeyShowPublicIOEquations*(zkey: ZKey, do_include_const1: bool) =
+  let N     = zkey.header.domainSize
+  let npubs = zkey.header.npubs + 1                  # NOTE: zkey's npubs does NOT include the constant 1 !!!!!!
+  let mats  = zkeyToSparseMatrices(zkey)
+  let A = toSparseRowMatrix(mats.A)
+  let B = toSparseRowMatrix(mats.B)
+  let C = toSparseRowMatrix(mats.C)
+
+  echo ""
+  for i in 0..<N:
+    let rowA = A.rows[i]
+    let rowB = B.rows[i]
+    let rowC = C.rows[i]
+
+    if ( doesPublicIOAppears( npubs , rowA , do_include_const1 ) or
+         doesPublicIOAppears( npubs , rowB , do_include_const1 ) or
+         doesPublicIOAppears( npubs , rowC , do_include_const1 ) ):   
+      echo "row #" & $i & ": " & renderSparseRowR1CSEq( rowA , rowB , rowC )
+
+  echo ""
 
 #-------------------------------------------------------------------------------
 
@@ -114,7 +152,7 @@ proc printGrothHeader*(hdr: GrothHeader) =
 
 #-------------------------------------------------------------------------------
 
-proc printR1csStats*(zkey: ZKey) = 
+proc printMatrixStats*(zkey: ZKey) = 
   let matrices = zkeyToSparseMatrices(zkey)
   echo "average row density of A = " & $(sparseMatrixAvgRowDensity(matrices.A))
   echo "average row density of B = " & $(sparseMatrixAvgRowDensity(matrices.B))

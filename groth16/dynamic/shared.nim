@@ -8,16 +8,41 @@ import constantine/named/properties_fields
 
 import groth16/bn128
 import groth16/bn128/arrays
+import groth16/misc
 
 import groth16/math/domain
 import groth16/math/ntt
 import groth16/math/group_fft
 import groth16/math/poly
 import groth16/math/convolution
+import groth16/math/convert
 
 import groth16/zkey_types
-
 import groth16/dynamic/types
+
+#-------------------------------------------------------------------------------
+
+#
+# the points `delta^-1 * (tau^N-1) * tau^i * g1`
+#
+# - in Jens-syle setup, these are simply part of the prover key
+# - in Jordi-style setup, you have to do an group IFFT
+#
+proc getDeltaZTauPows*(zkey: ZKey): seq[G1] = 
+  var deltaZTau : seq[G1]      
+  case zkey.header.flavour     
+
+    of JensGroth:
+      deltaZTau = zkey.pPoints.pointsH1
+
+    of Snarkjs:
+      echo "Jordi-style .zkey detected; converting points! (slow...)"
+      withMeasureTime(true,"Jordi-to-Jens conversion"):
+        let N = zkey.header.domainSize
+        let D = createDomain( N )
+        deltaZTau = convertPointsFromJordi(D , zkey.pPoints.pointsH1)
+  
+  return deltaZTau
 
 #-------------------------------------------------------------------------------
 
@@ -234,18 +259,21 @@ func evalLagrangeProductViaLemma*(D: Domain, i: int, k: int, tau: F): F =
 # > phi_ii = - sum_j phi_ij = - sum_j ( W[j-i]*L[i] + W[i-j]*L[j] )
 # > phi_ij = W[j-i]*L[i] + W[i-j]*L[j] 
 #
-func calculateDiagPhiFFT*( wvec: seq[F], deltaLZ: seq[G1] ): seq[G1] =
+func calculateDiagPhiFFT1*( wvec: seq[F], deltaLZ: seq[G1], wConvDeltaLZ: seq[G1] ): seq[G1] =
   let N = wvec.len
   assert( N == deltaLZ.len )
 
   let sumW = sumSeqFr( wvec )
 
-  var hs: seq[G1] = groupConvolution( wvec , deltaLZ )
+  var hs: seq[G1] = wConvDeltaLZ
   for i in 0..<N:
     hs[i] += (sumW ** deltaLZ[i])
     hs[i] =  negG1(hs[i])
 
   return hs
+
+func calculateDiagPhiFFT*( wvec: seq[F], deltaLZ: seq[G1] ): seq[G1] =
+  return calculateDiagPhiFFT1( wvec, deltaLZ, groupConvolution(wvec , deltaLZ) )
 
 # NOTE: this is EXTREMELY SLOW
 proc calculateDiagPhiNaive*( wvec: seq[F], deltaLZ: seq[G1], pool: Taskpool ): seq[G1] =
@@ -295,6 +323,32 @@ func crossTermCoeffs*(D: Domain, As: seq[F], Bs: seq[F]) : seq[F] =
  
   for k in 0..<N:
     output[k] = As[k]*Bconv[k] + Bs[k]*Aconv[k] - ABconv[k] - ABs[k]*sumW
+
+  return output
+
+#---------------------------------------
+
+func crossTermCoeffsSubgroup*(wvec: seq[F], sg: Subgroup, As: seq[F], Bs: seq[F]) : seq[F] =
+
+  let D = sg.smallDomain
+  let N = D.domainSize
+  assert( N == As.len )
+  assert( N == Bs.len )
+
+  let ABs = pointwiseProdFr( As, Bs )
+
+  let wvecBar = selectOnSubgroup( sg , fftReverseVec(wvec) )
+ 
+  let Aconv  = fieldConvolution( wvecBar , As  )
+  let Bconv  = fieldConvolution( wvecBar , Bs  )
+  let ABconv = fieldConvolution( wvecBar , ABs )
+
+  let sumW = sumOfWVec( N )
+
+  var output: seq[F] = newSeq[F]( N )
+ 
+  for k in 0..<N:
+    output[k] = As[k]*Bconv[k] + Bs[k]*Aconv[k]   # - ABconv[k] - ABs[k]*sumW
 
   return output
 

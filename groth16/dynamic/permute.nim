@@ -18,6 +18,7 @@ import groth16/bn128
 import groth16/bn128/arrays
 import groth16/math/domain
 import groth16/math/matrix
+import groth16/files/r1cs
 import groth16/zkey_types
 import groth16/misc
 
@@ -31,6 +32,9 @@ type
     srcIndices* : seq[int]
 
 #-------------------------------------------------------------------------------
+
+func permutationSize*(perm: Permutation): int = 
+  return perm.srcIndices.len
 
 func isPermutation*(input: seq[int]): bool =
   let n = input.len
@@ -81,19 +85,20 @@ func permuteMatrixRows*[T]( perm: Permutation , mat: SparseMatrix[T] ): SparseMa
 
 #-------------------------------------------------------------------------------
 
-func liesInSubgroup*( sg: Subgroup, mask: seq[bool] ): bool = 
-  let N = sg.bigDomain.domainSize
-  let K = sg.smallDomain.domainSize
-  let J = N div K
-
-  assert( N == mask.len )
-
-  var ok = true
-  for (i,b) in mask.pairs:
-    if b:
-      ok = ok and ((i mod J) == 0)
-
-  return ok
+func permuteR1CSRows*( perm: Permutation , r1cs: R1CS ): R1CS =
+  let N = perm.srcIndices.len 
+  assert( r1cs.nConstr <= N )
+  var newConstraints: seq[Constraint] = newSeq[Constraint]( N )
+  for i in 0..<N:
+    let k = perm.srcIndices[i]
+    if k < r1cs.nConstr:
+      newConstraints[i] = r1cs.constraints[k]
+    else:
+      newConstraints[i] = emptyConstraint
+  var newR1CS = r1cs
+  newR1CS.nConstr     = N
+  newR1CS.constraints = newConstraints
+  return newR1CS
 
 #-------------------------------------------------------------------------------
 
@@ -173,4 +178,40 @@ proc zkeyFindRowPermutation*(zkey: ZKey, witness_delta_mask: seq[bool]): (int,Pe
   return findRowPermutation( matrices.A , matrices.B , witness_delta_mask )
 
 #-------------------------------------------------------------------------------
+
+proc r1csPermuteToSubgroup*(r1cs_orig: R1CS, witness_delta_mask: seq[bool], do_add_malleability_eqs: bool = true ): R1CS =
+ 
+  var r1cs: R1CS
+  if do_add_malleability_eqs: 
+    r1cs = r1csAddMalleabilityEquations( r1cs_orig )
+  else:
+    r1cs = r1cs_orig
+
+  let log2  = ceilingLog2(r1cs.nConstr)
+  let N     = (1 shl log2)
+  let npubs = r1cs.cfg.nPubIn + r1cs.cfg.nPubOut + 1
+  let N1    = N - npubs
+  assert( r1cs.nConstr <= N1  , "snarkjs adds some extra rows for the public inputs" )
+  let M    = r1cs.cfg.nWires
+  let newDims = MatrixDims( nrows: N, ncols: M )
+  let mats = r1csToSparseMatrices( r1cs )
+  var A = mats.A ; A.dims = newDims
+  var B = mats.B ; B.dims = newDims
+  var (K, perm) = findRowPermutation( A , B , witness_delta_mask )
+
+  # snarkjs adds some extra row for the public inputs...
+  # so we need to subtract that many to have enough space
+  perm.srcIndices = toSeq(perm.srcIndices[0..<N1])
+  
+  echo "witness update size = " & $countTrues(witness_delta_mask)
+  echo "total constraints   = " & $permutationSize(perm)
+  echo "subgroup size       = " & $K
+  return permuteR1CSRows( perm , r1cs )
+
+proc exportPermutedR1CS*(fname: string, r1cs: R1CS, witness_delta_mask: seq[bool] ) =
+  let newR1CS = r1csPermuteToSubgroup( r1cs, witness_delta_mask )
+  exportR1CS(fname, newR1CS)
+
+#-------------------------------------------------------------------------------
+
 

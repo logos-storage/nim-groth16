@@ -1,6 +1,6 @@
 
 #
-# parsing the `.r1cs` file computed by `circom` witness code genereators
+# parsing and exporting the `.r1cs` file computed by `circom` witness code genereators
 #
 # file format
 # ===========
@@ -50,18 +50,22 @@
 #
 
 import std/streams
+import std/sequtils
 
 import constantine/math/arithmetic
 import constantine/math/io/io_bigints
 import constantine/named/properties_fields
 
 import groth16/bn128
+import groth16/math/matrix
 import groth16/files/container
 
 #-------------------------------------------------------------------------------
 
 type 
  
+  F = Fr[BN254_Snarks]
+
   WitnessConfig* = object
     nWires*  : int           # total number of wires (or witness variables), including the constant 1 "variable"
     nPubOut* : int           # number of public outputs
@@ -80,6 +84,9 @@ type
     constraints* : seq[Constraint]
     wireToLabel* : seq[int]
 
+const emptyLinComb*    : LinComb    = @[]
+const emptyConstraint* : Constraint = ( emptyLinComb, emptyLinComb, emptyLinComb )
+
 #-------------------------------------------------------------------------------
 
 proc printWitnessConfig*(cfg: WitnessConfig) = 
@@ -94,6 +101,54 @@ proc printR1CSMetaData*(r1cs: R1CS) =
   printWitnessConfig(r1cs.cfg)
   echo "nConstraints = " & $r1cs.nConstr
   assert (r1cs.nConstr == r1cs.constraints.len)
+
+#
+# This is to stop a (nontrivial) malleability attack; see:
+#
+# <https://web.archive.org/web/20240320152158/https://geometry.xyz/notebook/groth16-malleability>
+# 
+# Note: Snarkjs does it automatically (as does Arkworks), however, it's hidden
+# in the ZKey generation proces... And it completely ruins our subgroup image thing
+#
+# So better do it manually, and patch Snarkjs not to do it if already presents...
+#
+proc r1csAddMalleabilityEquations*(orig: R1CS): R1CS = 
+
+  # the one is the constant 1 (0th witness element)
+  let npubs = 1 + orig.cfg.nPubOut + orig.cfg.nPubIn
+
+  var dummyEqs : seq[Constraint] = newSeq[Constraint]( npubs )
+  for i in 0..<npubs:
+    let lcA = @[ ( i , oneFr ) ]
+    dummyEqs[i] = ( A: lcA , B: emptyLinComb , C: emptyLinComb )
+
+  var r1cs = orig
+  r1cs.nConstr     = orig.nConstr + npubs
+  r1cs.constraints = concat( orig.constraints , dummyEqs )
+  return r1cs
+
+#-------------------------------------------------------------------------------
+
+func r1csToSparseMatrices*( r1cs: R1CS ): SparseMatrices =
+  let N = r1cs.nConstr
+  let M = r1cs.cfg.nWires
+  let dims : MatrixDims = MatrixDims( nrows: N, ncols: M )
+
+  var colsA: seq[SparseColumn[F]] = newSeq[SparseColumn[F]]( M )  
+  var colsB: seq[SparseColumn[F]] = newSeq[SparseColumn[F]]( M )  
+  var colsC: seq[SparseColumn[F]] = newSeq[SparseColumn[F]]( M )  
+
+  for (i, constraint) in r1cs.constraints.pairs:
+    let (lcA, lcB, lcC) = constraint
+    for (j,x) in lcA: columnInsertWithAddFr( colsA[j] , i , x )
+    for (j,y) in lcB: columnInsertWithAddFr( colsB[j] , i , y )
+    for (j,z) in lcC: columnInsertWithAddFr( colsC[j] , i , z )
+
+  let mA : SparseMatrix[F] = SparseMatrix[F]( dims: dims, columns: colsA )  
+  let mB : SparseMatrix[F] = SparseMatrix[F]( dims: dims, columns: colsB )  
+  let mC : SparseMatrix[F] = SparseMatrix[F]( dims: dims, columns: colsC ) 
+
+  return SparseMatrices( A: mA , B: mB , C: mC )
 
 #-------------------------------------------------------------------------------
 
@@ -257,9 +312,6 @@ proc exportR1CS*(fname: string, r1cs: R1CS) =
   let section1 = r1csHeaderSection(     r1cs)
   let section2 = r1csConstraintsSection(r1cs)
   let section3 = r1csWireToLabelSection(r1cs)
-  echo $section1.len
-  echo $section2.len
-  echo $section3.len
   var stream = newFileStream(fname, fmWrite)
   writeGlobalHeader(  stream , "r1cs" , 1 , 3 )
   writeSection(       stream , 2 , section2 )
@@ -267,6 +319,5 @@ proc exportR1CS*(fname: string, r1cs: R1CS) =
   writeSection(       stream , 3 , section3 )
   stream.flush()
   stream.close()
-  echo "fuck"
 
 #-------------------------------------------------------------------------------

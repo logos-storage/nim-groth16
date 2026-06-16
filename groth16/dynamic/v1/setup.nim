@@ -13,7 +13,7 @@ import groth16/math/domain
 import groth16/math/group_fft
 import groth16/math/poly
 import groth16/math/convolution
-import groth16/math/convert
+# import groth16/math/convert
 # import groth16/math/ntt
 
 import groth16/zkey_types
@@ -29,16 +29,7 @@ proc dynaSetupV1FromZKey*(zkey: Zkey, pool: Taskpool ): DynaSetupV1 =
   let N = zkey.header.domainSize
   let D = createDomain(N)
 
-  var deltaZTau : seq[G1]      # the points `delta^-1 * (tau^N-1) * tau^i * g1`
-  case zkey.header.flavour     
-
-    of JensGroth:
-      deltaZTau = zkey.pPoints.pointsH1
-
-    of Snarkjs:
-      echo "Jordi-style .zkey detected; converting points! (slow...)"
-      withMeasureTime(true,"Jordi-to-Jens conversion"):
-        deltaZTau = convertPointsFromJordi(D , zkey.pPoints.pointsH1)
+  let deltaZTau = getDeltaZTauPows(zkey)
   
   let sumW    = sumOfWVec( N )
   let wvec    = calculateWVec( D )

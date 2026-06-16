@@ -15,7 +15,15 @@ is noticeably more efficient in practice.
 
 We provide several slightly different versions with different tradeoffs
 
-- `dynamic/v1`: This is a version mostly following the Dynark paper (TODO: sparse convolution algorithm)
+- `dynamic/v1`: This is a version mostly following the Dynark paper 
+     - TODO: sparse convolution algorithm
 - `dyanmic/v2`: This introduces some of our optimizations: 
      - the projection term updates become essentially free
-     - we reorder the circuit so that the changes are in a subgroup (TODO)
+     - micro-optim: concatenate all the `pi_C` MSMs into one
+- `dyanmic/v3`: 
+     - we reorder the circuit so that the changes are in a subgroup
+     - so cross-terms becomes `O(D*log(D)`, and also just 1 MSM instead of 2
+     - so the updates now are essentially optimal
+     - TODO: half of the very slow group FFTs (during the slow preprocessing step) 
+       also becomes `O(D*log)`, so that's essenitally a 2x speedup
+
