@@ -53,9 +53,39 @@ func projectionElementsV2*(setup: DynaSetupV2, D: Domain, As: seq[F], complImage
 
   return Us
 
-#---------------------------------------
+#-------------------------------------------------------------------------------
 
-proc dynaPreprocessV2*(zkey: ZKey, setup: DynaSetupV2, partialAB: PartialAB, zdeltaMask: seq[bool] ): DynaPreprocessV2 =
+proc compactifyPointsC1( zkey: ZKey, partial_mask: seq[bool] ): seq[G1] =
+
+  let hdr  : GrothHeader  = zkey.header
+  let spec : SpecPoints   = zkey.specPoints
+  let pts  : ProverPoints = zkey.pPoints     
+
+  let nvars = hdr.nvars
+  let npubs = hdr.npubs
+
+  # note: we have to ignore public inputs (plus 1 for the special first entry)
+  let startIdx : int = npubs + 1
+  let count    : int = countFalses(partial_mask) 
+
+  var compact_pointsC1: seq[G1] = newSeq[G1](count)
+
+  var j: int = 0;
+  for i in 0..<nvars:
+    if (not partial_mask[i]):
+      if i >= startIdx:
+        compact_pointsC1[j] = pts.pointsC1[ i - startIdx ]
+      else:
+        compact_pointsC1[j] = infG1
+      j += 1
+
+  assert( nvars - npubs - 1 == pts.pointsC1.len )
+
+  return compact_pointsC1
+
+#-------------------------------------------------------------------------------
+
+proc dynaPreprocessV2*(zkey: ZKey, setup: DynaSetupV2, partialAB: PartialAB, partial_mask: seq[bool], zdeltaMask: seq[bool] ): DynaPreprocessV2 =
   let N = zkey.header.domainSize
   let D = createDomain(N)
 
@@ -69,6 +99,8 @@ proc dynaPreprocessV2*(zkey: ZKey, setup: DynaSetupV2, partialAB: PartialAB, zde
   let m = countTrues(zdeltaMask)
   var Xs: seq[G1] = newSeq[G1]( m )
 
+  let points_C1 = compactifyPointsC1( zkey, partial_mask )
+
   withMeasureTime(true," + the \"unified\" points X_j"):
 
     let matABC = zkeyToSparseMatrices(zkey)
@@ -76,7 +108,7 @@ proc dynaPreprocessV2*(zkey: ZKey, setup: DynaSetupV2, partialAB: PartialAB, zde
     let colsB = selectTrues( zdeltaMask , matABC.B.columns )
 
     for j in 0..<m:
-      var h : G1 = infG1
+      var h : G1 = points_C1[j]
       for (k,a) in colsA[j].pairs: h += (a ** projB_full[k])
       for (k,b) in colsB[j].pairs: h += (b ** projA_full[k])
       Xs[j] = h
@@ -113,7 +145,8 @@ proc dynaPreProofV2*(zkey: ZKey, setup: DynaSetupV2, partialWitness: PartialWitn
   let N = zkey.header.domainSize
   let D = createDomain(N)
 
-  let zdeltaMask = notBoolSeq( partialWitnessMask( partialWitness ) )
+  let partialMask = partialWitnessMask( partialWitness )
+  let zdeltaMask  = notBoolSeq( partialMask )
 
   var partialAB : PartialAB
   withMeasureTime(printTimings,"build partial AB"):
@@ -137,7 +170,7 @@ proc dynaPreProofV2*(zkey: ZKey, setup: DynaSetupV2, partialWitness: PartialWitn
 
   var preprocess : DynaPreprocessV2
   withMeasureTime(printTimings,"precomputing the \"projection\" points"):
-    preprocess = dynaPreprocessV2( zkey, setup, partialAB, zdeltaMask )
+    preprocess = dynaPreprocessV2( zkey, setup, partialAB, partialMask, zdeltaMask )
 
   return DynaPreProofV2( partialProof   : partialProof ,
                          deltaImages    : deltaImages  ,

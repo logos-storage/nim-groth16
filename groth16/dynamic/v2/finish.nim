@@ -40,6 +40,83 @@ import groth16/dynamic/v2/setup
 
 #-------------------------------------------------------------------------------
 
+# you can turn on/off the computation of the nonlinear term (useful for the "dynark" version)
+proc finishLinearTerms( zkey: ZKey, wtns: Witness, partialProof: PartialProof, mask: Mask, pool: Taskpool, printTimings: bool): Proof =
+
+  assert( zkey.header.curve == wtns.curve )
+
+  let witness = wtns.values
+
+  let hdr  : GrothHeader  = zkey.header
+  let spec : SpecPoints   = zkey.specPoints
+  let pts  : ProverPoints = zkey.pPoints     
+
+  let nvars = hdr.nvars
+  let npubs = hdr.npubs
+
+  assert( nvars == witness.len , "wrong witness length" )
+
+  let partial_mask = partialProof.partial_mask
+
+  # remark: with the special variable "1" we actuall have (npub+1) public IO variables
+  var pubIO = newSeq[Fr[BN254_Snarks]]( npubs + 1)
+  for i in 0..npubs: pubIO[i] = witness[i]             
+
+  # note: we have to ignore public inputs (plus 1 for the special first entry)
+  let startIdx : int = npubs + 1
+  var count    : int = countFalses(partial_mask)       # number of NEW witness elements 
+
+  # compactify the stuff so we can call normal vector MSM
+  var compact_witness:  seq[F]  = newSeq[F](count)
+  var compact_pointsA1: seq[G1] = newSeq[G1](count)
+  var compact_pointsB1: seq[G1] = newSeq[G1](count)
+  var compact_pointsB2: seq[G2] = newSeq[G2](count)
+  block:
+    var j: int = 0;
+    for i in 0..<nvars:
+      if (not partial_mask[i]):
+        compact_witness[j ] = witness[i]
+        compact_pointsA1[j] = pts.pointsA1[i]
+        compact_pointsB1[j] = pts.pointsB1[i]
+        compact_pointsB2[j] = pts.pointsB2[i]
+        j += 1
+
+  # masking coeffs
+  let r = mask.r
+  let s = mask.s
+
+  assert( witness.len == pts.pointsA1.len )
+  assert( witness.len == pts.pointsB1.len )
+  assert( witness.len == pts.pointsB2.len )
+  assert( hdr.domainSize == pts.pointsH1.len )
+
+  # echo "count = " & $count
+  # for x in compact_witness:
+  #   echo toDecimalFr(x)
+
+  var pi_a : G1 = partialProof.partial_pi_a
+  withMeasureTime(printTimings,"computing pi_A (G1 MSM)"):
+    pi_a += r ** spec.delta1
+    pi_a += msmMultiThreadedG1( compact_witness , compact_pointsA1, pool )
+
+  var rho : G1 = partialProof.partial_rho
+  withMeasureTime(printTimings,"computing rho (G1 MSM)"):
+    # rho += s ** spec.delta1
+    rho += msmMultiThreadedG1( compact_witness , compact_pointsB1, pool )
+
+  var pi_b : G2 = partialProof.partial_pi_b
+  withMeasureTime(printTimings,"computing pi_B (G2 MSM)"):
+    pi_b += s ** spec.delta2
+    pi_b += msmMultiThreadedG2( compact_witness , compact_pointsB2, pool )
+
+  var pi_c : G1 = partialProof.partial_pi_c
+  pi_c += s ** pi_a
+  pi_c += r ** rho
+
+  return Proof( curve:"bn128", publicIO:pubIO, pi_a:pi_a, pi_b:pi_b, pi_c:pi_c )
+
+#-------------------------------------------------------------------------------
+
 proc finishDynaProofWithMaskV2*( zkey: ZKey, wtns: Witness, dynaPreProof: DynaPreProofV2, mask: Mask, pool: Taskpool, printTimings: bool): Proof =
 
   let N = zkey.header.domainSize
@@ -63,7 +140,7 @@ proc finishDynaProofWithMaskV2*( zkey: ZKey, wtns: Witness, dynaPreProof: DynaPr
 
   var proof: Proof
   withMeasureTime(printTimings,"finishing the linear terms"):
-    proof = finishPartialProofWithMaskGeneric( false, zkey, wtns, dynaPreProof.partialProof, mask, pool, false )
+    proof = finishLinearTerms( zkey, wtns, dynaPreProof.partialProof, mask, pool, false )
 
   var nonlin: G1 = infG1
 
