@@ -154,6 +154,67 @@ proc groupConvolveWithWVecBar*( D: Domain, gs: seq[G1] ): seq[G1] =
   inplaceScalarMulByFFTofWVecBar( gsHat )
   return inverseGroupFFT( gsHat , D)
 
+#---------------------------------------
+
+# only computes the result on a subgroup
+proc fieldConvolveWithWVecBarOnSubgroup*( sg: Subgroup, xs: seq[F] ): seq[F] =
+
+  let N = xs.len
+  assert( N == sg.bigDomain.domainSize )
+  let D = sg.bigDomain
+  let K = sg.smallDomain.domainSize
+  let ell = N div K
+
+  let fN   = intToFr( N )
+  let invN = invFr(  fN )
+  let fell    : F = intToFr(ell)
+  let invN_per_fell : F = invN / fell
+
+  let xsHat = forwardNTT( xs , D )
+  var ysHat : seq[F] = newSeq[F]( K )
+
+  let c0  = divBy2Fr(oneFr - fN) * invN_per_fell
+  for k in 0..<K:
+    var sum: F = zeroFr
+    for i in 0..<ell:
+      let kk = k + K*i
+      let kk_rev = (if kk==0: 0 else: N-kk)
+      let u = c0 + intToFr(kk_rev) * invN_per_fell
+      sum += u * xsHat[kk]
+    ysHat[k] = sum
+
+  return inverseNTT( ysHat , sg.smallDomain )
+
+#---------------------------------------
+
+proc groupConvolveWithWVecOnSubgroup*( sg: Subgroup, pts: seq[G1] ): seq[G1] =
+
+  let N = pts.len
+  assert( N == sg.bigDomain.domainSize )
+  let D = sg.bigDomain
+  let K = sg.smallDomain.domainSize
+  let ell = N div K
+
+  let fN   = intToFr( N )
+  let invN = invFr(  fN )
+  let fell    : F = intToFr(ell)
+  let invN_per_fell : F = invN / fell
+
+  var ptsHat = forwardGroupFFT( pts , D )
+
+  var small   : seq[G1] = newSeq[G1]( K ) 
+  var miniPts : seq[G1] = newSeq[G1]( ell )
+  var miniCfs : seq[F]  = newSeq[F] ( ell )
+  let c0  = divBy2Fr(oneFr - fN) * invN_per_fell
+  for k in 0..<K:
+    for i in 0..<ell:
+      let kk = k + K*i
+      miniCfs[i] = c0 + intToFr(kk) * invN_per_fell
+      miniPts[i] = ptsHat[kk]
+    small[k] = msmConstantineG1( miniCfs , miniPts )
+
+  return inverseGroupFFT( small , sg.smallDomain )
+
 #-------------------------------------------------------------------------------
 
 # computes the vectors A*z, B*z (but skips C*z)

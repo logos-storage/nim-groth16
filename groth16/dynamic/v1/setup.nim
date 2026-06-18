@@ -6,8 +6,8 @@
 import taskpools
 
 import groth16/bn128
-import groth16/bn128/arrays
 import groth16/misc
+#import groth16/bn128/arrays
 
 import groth16/math/domain
 import groth16/math/group_fft

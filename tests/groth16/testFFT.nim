@@ -84,4 +84,10 @@ suite "convolution checks":
   test "FFT group convolutions vs. slow reference":
     check isEqualG1Seq( groupConvolution(xs,gs) , naiveGroupConvolution(xs,gs) )
 
+  test "FFT field convolution evaluated on a subgroup":
+    check testFieldConvolutionOnSubgroup( 32 , 8 )
+
+  test "FFT group convolution evaluated on a subgroup":
+    check testGroupConvolutionOnSubgroup( 128 , 16 )
+
 #-------------------------------------------------------------------------------

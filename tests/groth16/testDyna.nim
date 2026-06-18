@@ -17,9 +17,9 @@ import groth16/math/convolution
 
 import groth16/dynamic/types
 import groth16/dynamic/shared
-import groth16/dynamic/setup
-import groth16/dynamic/preprocess
-import groth16/dynamic/finish
+import groth16/dynamic/v1/preprocess
+#import groth16/dynamic/v1/setup
+#import groth16/dynamic/v1/finish
 
 #-------------------------------------------------------------------------------
 
@@ -30,7 +30,9 @@ func ones(N : int): seq[F] = constSeq(N, oneFr)
 suite "dynamic proof (Dynark) tests":
 
   let N : int = 128
-  let D = createDomain( N )
+  let K : int =  32
+  let D  = createDomain( N )
+  let sg = createSubgroup( D , K )
   let tau   : F = randFr()
   let delta : F = randFr()
 
@@ -75,6 +77,12 @@ suite "dynamic proof (Dynark) tests":
     let rhs = fieldConvolution( xs , calculateWVecBar(D) )
     check isEqualFrSeq( lhs , rhs )  
 
+  test "field convolution with WvecBar on a subgroup":
+    let xs  = randFrSeq( N )
+    let lhs = fieldConvolveWithWVecBarOnSubgroup( sg , xs ) 
+    let rhs = selectOnSubgroup( sg , fieldConvolution( xs , calculateWVecBar(D) ) )
+    check isEqualFrSeq( lhs , rhs )  
+
   test "group convolution with Wvec":
     let gs  = randG1Seq( N )
     let lhs = groupConvolveWithWVec( D , gs ) 
@@ -85,6 +93,12 @@ suite "dynamic proof (Dynark) tests":
     let gs  = randG1Seq( N )
     let lhs = groupConvolveWithWVecBar( D , gs ) 
     let rhs = groupConvolution( calculateWVecBar(D) , gs )
+    check isEqualG1Seq( lhs , rhs )  
+
+  test "group convolution with Wvec on a subgroup":
+    let gs  = randG1Seq( N )
+    let lhs = groupConvolveWithWVecOnSubgroup( sg , gs ) 
+    let rhs = selectOnSubgroup( sg , groupConvolution( calculateWVec(D) , gs ) )
     check isEqualG1Seq( lhs , rhs )  
 
   test "expansion of the product of Lagrange polynomials":

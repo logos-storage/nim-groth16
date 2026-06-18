@@ -9,8 +9,8 @@ import std/options
 
 import taskpools
 
-import constantine/math/arithmetic
-import constantine/named/properties_fields
+#import constantine/math/arithmetic
+#import constantine/named/properties_fields
 
 import groth16/bn128
 import groth16/bn128/arrays
@@ -20,9 +20,9 @@ import groth16/zkey_types
 import groth16/files/witness
 
 import groth16/math/domain
-import groth16/math/ntt
-import groth16/math/poly
 import groth16/math/convolution
+#import groth16/math/poly
+#import groth16/math/ntt
 
 import groth16/prover/types
 import groth16/prover/shared
@@ -30,7 +30,6 @@ import groth16/partial/finish
 
 import groth16/dynamic/shared
 import groth16/dynamic/v1/types
-import groth16/dynamic/v1/setup
 
 #-------------------------------------------------------------------------------
 

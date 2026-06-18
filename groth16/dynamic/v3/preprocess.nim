@@ -26,22 +26,70 @@ import groth16/partial/precalc
 
 import groth16/dynamic/shared
 import groth16/dynamic/permute
-import groth16/dynamic/v2/types as v2types
+# import groth16/dynamic/v2/types as v2types
 import groth16/dynamic/v2/preprocess
 import groth16/dynamic/v3/types
 import groth16/dynamic/v3/setup
 
 #-------------------------------------------------------------------------------
 
-func convert_preprocess_V2_to_V3( v2: DynaPreprocessV2 ): DynaPreprocessV3 = 
-  return DynaPreprocessV3( unified: v2.unified )
+func projectionElementsV3*(setup: DynaSetupV3, As: seq[F] ): seq[G1] =
+  let sg = setup.imageSubgroup
+  let D  = sg.bigDomain
+  let N  = D.domainSize
+  let K  = sg.smallDomain.domainSize
+  let ell = N div K
 
-func convert_setup_V3_to_V2( v3: DynaSetupV3 ): DynaSetupV2 =
-  let fakePhi: seq[G1] = newSeq[G1]()
-  return DynaSetupV2( weightVec     : v3.weightVec     ,
-                      pointsDeltaLZ : v3.pointsDeltaLZ ,
-                      wConvDeltaLZ  : v3.wConvDeltaLZ  ,
-                      diagPhiPoints : fakePhi          )
+  var Us: seq[G1] = newSeq[G1]( K )
+
+  let fldN : F = intToFr( N ) 
+  let sumW : F = sumOfWVec( N ) 
+
+  let WBarStarA : seq[F]  = fieldConvolveWithWVecBarOnSubgroup( sg , As ) 
+  let ALstarW   : seq[G1] = groupConvolveWithWVecOnSubgroup( sg , pointwiseScaleG1( As , setup.pointsDeltaLZ ) )
+
+  # 2*d scalar multiplications + the group convolution above
+  for k in 0..<K: 
+ 
+    let ellk = ell*k
+    let cf : F = WBarStarA[k] - As[ellk] * sumW
+    Us[k] = ALstarW[k] - (As[ellk] ** setup.wConvDeltaLZ[ellk]) + (cf ** setup.pointsDeltaLZ[ellk])
+
+  return Us
+
+#-------------------------------------------------------------------------------
+
+proc dynaPreprocessV3*(zkey: ZKey, setup: DynaSetupV3, partialAB: PartialAB, partial_mask: seq[bool], zdeltaMask: seq[bool] ): DynaPreprocessV3 =
+  let sg  = setup.imageSubgroup
+  let D   = sg.bigDomain
+  let K   = sg.smallDomain.domainSize
+  let N   = D.domainSize
+  let ell = N div K
+
+  var projA_mini: seq[G1]
+  var projB_mini: seq[G1]
+  withMeasureTime(true," + the \"projection\" points U_k, V_k"):
+    projA_mini = projectionElementsV3( setup , partialAB.valuesAz )
+    projB_mini = projectionElementsV3( setup , partialAB.valuesBz )
+
+  let m = countTrues(zdeltaMask)
+  var Xs: seq[G1] = newSeq[G1]( m )
+
+  let points_C1 = compactifyPointsC1( zkey, partial_mask )
+
+  withMeasureTime(true," + the \"unified\" points X_j"):
+
+    let matABC = zkeyToSparseMatrices(zkey)
+    let colsA = selectTrues( zdeltaMask , matABC.A.columns )
+    let colsB = selectTrues( zdeltaMask , matABC.B.columns )
+
+    for j in 0..<m:
+      var h : G1 = points_C1[j]
+      for (k,a) in colsA[j].pairs: h += (a ** projB_mini[k div ell])
+      for (k,b) in colsB[j].pairs: h += (b ** projA_mini[k div ell])
+      Xs[j] = h
+
+  return DynaPreprocessV3( unified: Xs )
 
 #-------------------------------------------------------------------------------
 
@@ -84,15 +132,14 @@ proc dynaPreProofV3*(zkey: ZKey, setup: DynaSetupV3, partialWitness: PartialWitn
 
   partialProof.partial_pi_c += nonlin
 
-  var preprocessV3 : DynaPreprocessV3
+  var preprocess : DynaPreprocessV3
   withMeasureTime(printTimings,"precomputing the \"projection\" and then the unified points"):
-    let setupV2   = convert_setup_V3_to_V2( setup )
-    preprocessV3  = convert_preprocess_V2_to_V3( dynaPreprocessV2( zkey, setupV2, partialAB, partialMask, zdeltaMask ))
+    preprocess = dynaPreprocessV3( zkey, setup, partialAB, partialMask, zdeltaMask )
 
   return DynaPreProofV3( partialProof   : partialProof ,
                          deltaImages    : deltaImages  ,
                          dynaSetup      : setup        ,
-                         dynaPreprocess : preprocessV3 )
+                         dynaPreprocess : preprocess   )
 
 #-------------------------------------------------------------------------------
 

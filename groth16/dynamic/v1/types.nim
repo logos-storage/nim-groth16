@@ -4,7 +4,7 @@
 #import constantine/named/properties_fields
 
 import groth16/bn128
-import groth16/math/domain
+#import groth16/math/domain
 #import groth16/math/ntt
 #import groth16/math/poly
 

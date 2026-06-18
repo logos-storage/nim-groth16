@@ -10,12 +10,10 @@
 # this is V1, the version closest to the Dynark paper
 #
 
-import std/options
-
 import taskpools
 
 import constantine/math/arithmetic
-import constantine/named/properties_fields
+#import constantine/named/properties_fields
 
 import groth16/bn128
 import groth16/bn128/arrays
@@ -24,7 +22,6 @@ import groth16/misc
 import groth16/zkey_types
 
 import groth16/math/domain
-import groth16/math/convolution
 import groth16/math/poly
 
 import groth16/partial/precalc
@@ -32,7 +29,6 @@ import groth16/partial/precalc
 import groth16/dynamic/shared
 import groth16/dynamic/v1/types
 import groth16/dynamic/v1/setup
-import groth16/dynamic/v1/finish
 
 
 #-------------------------------------------------------------------------------
