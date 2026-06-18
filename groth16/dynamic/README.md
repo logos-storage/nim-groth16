@@ -20,10 +20,9 @@ We provide several slightly different versions with different tradeoffs
 - `dyanmic/v2`: This introduces some of our optimizations: 
      - the projection term updates become essentially free
      - micro-optim: concatenate all the `pi_C` MSMs into one
-- `dyanmic/v3`: 
+- `dyanmic/v3`: Finally:
      - we reorder the circuit so that the changes are in a subgroup
-     - so cross-terms becomes `O(D*log(D)`, and also just 1 MSM instead of 2
-     - so the updates now are essentially optimal
-     - TODO: half of the very slow group FFTs (during the slow preprocessing step) 
-       also becomes `O(D*log)`, so that's essenitally a 2x speedup
+     - cross-term becomes `O(D*log(D))`, so the updates are now essentially optimal
+     - half of the very slow group FFTs (during the slow preprocessing step) also
+       becomes `O(D*log(D))`, so that's essenitally a 2x speedup in the preprocessing
 
