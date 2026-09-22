@@ -38,7 +38,7 @@ heavy precalculation when the full witness changes.
 
 Whether that's worth it depends on the particular use-case.
 
-A version of this idea is implemented under `groth16/dynamic/`.
+A few variations of this idea is implemented under `groth16/dynamic/`.
 
 ### License
 
@@ -58,6 +58,6 @@ at your choice.
 - [ ] add Groth16 explanatory notes
 - [ ] document the `snarkjs` circuit-specific setup `H` points convention
 - [x] precalculate stuff for "partial" proofs
-- [ ] implement Dynark style "dynamic proofs" too
+- [x] implement Dynark style "dynamic proofs" too
 - [ ] benchmarks
 - [ ] make it work for different curves

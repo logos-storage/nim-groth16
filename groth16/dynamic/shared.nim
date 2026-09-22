@@ -396,13 +396,13 @@ func crossTermCoeffsSubgroup*(wvec: seq[F], sg: Subgroup, As: seq[F], Bs: seq[F]
   assert( N == As.len )
   assert( N == Bs.len )
 
-  let ABs = pointwiseProdFr( As, Bs )
-
   let wvecBar = selectOnSubgroup( sg , fftReverseVec(wvec) )
  
   let Aconv  = fieldConvolution( wvecBar , As  )
   let Bconv  = fieldConvolution( wvecBar , Bs  )
-  let ABconv = fieldConvolution( wvecBar , ABs )
+
+  # let ABs = pointwiseProdFr( As, Bs )
+  # let ABconv = fieldConvolution( wvecBar , ABs )
 
   let sumW = sumOfWVec( N )
 

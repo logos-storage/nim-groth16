@@ -1,14 +1,22 @@
 
 #
-# Finishing a V3e proof
+# Finishing a V3 proof
 #
-# We are implementing the cross-term differently from the paper:
-# 
-# - in the paper there are only two convolutions (4 field FFT-s), but 2 MSM-s
-# - we have three field convolutions (6 field FFT-s), but only 1 MSM. 
+# We are implementing the cross-term in O(D*log(D)) time by doing the
+# convolution on the subgroup, but otherwise it's the same as in the paper
+# (2 convolutions and 2 MSMs, one for diagonal and one for the off-diagonal).
 #
-# In practice our version is significantly faster, as MSM-s are much more expensive
-# than field FFTs (at least for practical sizes)
+# Unfortunately, it seems it's not possible to improve on this... 
+#
+# (intuition: the Az' and Bz' are 2D field elements of "new information"...
+# We can also do the power basis instead of the Lagrange polynomial basis, there
+# it's also clear: you multiply two degree D polynomials, the result has
+# degree of freedom 2D. While originally it all comes from "z'" which has
+# size only approx D, on that we depend quadratically, not linearly, which
+# is why it doesn't work out...)
+#  
+# We tried the power basis version too (with 6 convolution 1 bigger MSM??), but 
+# that only becomes more complicated, and the end result looks similar after all
 #
 
 import std/options
@@ -165,7 +173,7 @@ proc finishDynaProofWithMaskV3*( zkey: ZKey, wtns: Witness, dynaPreProof: DynaPr
   var cross_ps: seq[G1]
 
   # note: this version only really makes sense if we can restrict to a subgroup (?)
-  withMeasureTime(printTimings,"computing the nonlinear \"cross\" term (3 convolution 1 MSM style)"):
+  withMeasureTime(printTimings,"computing the nonlinear \"cross\" term (same as the Dynark but O(D*log(D))"):
     let miniD = sg.smallDomain
     let K = miniD.domainSize
     let ell = N div K
