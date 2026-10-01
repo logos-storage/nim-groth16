@@ -23,8 +23,7 @@ type
     imageSubgroup*  : Subgroup     # the subgroup the changes fall on
     weightVec*      : seq[F]       # the values `W_k` (it's surprisingly slow to re-compute in the finish part!)
     pointsDeltaLZ*  : seq[G1]      # the points `delta^-1 * L_i(tau) * Z(tau) * g1` where `Z(x) = x^N-1`
-    wConvDeltaLZ*   : seq[G1]      # the convolution of `W` and `pointsDeltaLZ`
-    miniDiagPoints* : seq[G1]      # corrections for subgroup convolution...
+    miniDiagPoints* : seq[G1]      # Psi_k = delta^-1 * psi_k(tau) * Z(tau) * g1` (diagonal) points on the subgroup
 
   # things we can compute from the partial witness
   DynaPreprocessV3* = object

@@ -29,24 +29,28 @@ proc dynaSetupV3FromZKey*(zkey: Zkey, subgroupSize: int, pool: Taskpool ): DynaS
 
   assert( isPowerOfTwo(subgroupSize) , "subgroup size should be a power of two!")
 
-  let N  = zkey.header.domainSize
-  let K  = subgroupSize
-  let D  = createDomain(N)
-  let sg = createSubgroup( D , K)
+  let N   = zkey.header.domainSize
+  let K   = subgroupSize
+  let D   = createDomain(N)
+  let sg  = createSubgroup( D , K)
+  let ell = N div K
 
   let deltaZTau = getDeltaZTauPows(zkey)
+  let deltaLZ   = inverseGroupFFT( deltaZTau , D )
+  let sumW      = sumOfWVec( N )
 
-  let sumW    = sumOfWVec( N )
   let wvec    = calculateWVec( D )
-  let deltaLZ = inverseGroupFFT( deltaZTau , D )
-  let wconv   = groupConvolution( wvec , deltaLZ )
+  # let wconv   = groupConvolution( wvec , deltaLZ )
+  # let miniPts = selectOnSubgroup( sg , calculateDiagPhiFFT1( wvec , deltaLZ , wconv ) ) 
 
-  let miniPts = selectOnSubgroup( sg , calculateDiagPhiFFT1( wvec , deltaLZ , wconv ) ) 
+  var hs: seq[G1] = groupConvolveWithWVecOnSubgroup( sg , deltaLZ )
+  for i in 0..<K:
+    hs[i] += (sumW ** deltaLZ[ell*i])
+    hs[i] =  negG1(hs[i])
 
-  return DynaSetupV3( imageSubgroup  : sg         ,
-                      weightVec      : wvec       ,
-                      pointsDeltaLZ  : deltaLZ    , 
-                      wConvDeltaLZ   : wconv      ,
-                      miniDiagPoints : miniPts    )
+  return DynaSetupV3( imageSubgroup  : sg      ,
+                      weightVec      : wvec    ,       # TODO: remove this too
+                      pointsDeltaLZ  : deltaLZ , 
+                      miniDiagPoints : hs      )
 
  #-------------------------------------------------------------------------------

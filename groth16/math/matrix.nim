@@ -5,7 +5,7 @@ import constantine/math/arithmetic
 import constantine/named/properties_fields
 
 import groth16/bn128
-import groth16/bn128/arrays
+# import groth16/bn128/arrays
 
 #-------------------------------------------------------------------------------
 # dimensions

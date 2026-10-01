@@ -377,8 +377,7 @@ func crossTermCoeffs*(D: Domain, As: seq[F], Bs: seq[F]) : seq[F] =
   let Aconv  = fieldConvolveWithWVecBar( D , As  )
   let Bconv  = fieldConvolveWithWVecBar( D , Bs  )
   let ABconv = fieldConvolveWithWVecBar( D , ABs )
-
-  let sumW = sumOfWVec( N )
+  let sumW   = sumOfWVec( N )
 
   var output: seq[F] = newSeq[F]( N )
  
@@ -397,19 +396,13 @@ func crossTermCoeffsSubgroup*(wvec: seq[F], sg: Subgroup, As: seq[F], Bs: seq[F]
   assert( N == Bs.len )
 
   let wvecBar = selectOnSubgroup( sg , fftReverseVec(wvec) )
- 
-  let Aconv  = fieldConvolution( wvecBar , As  )
-  let Bconv  = fieldConvolution( wvecBar , Bs  )
-
-  # let ABs = pointwiseProdFr( As, Bs )
-  # let ABconv = fieldConvolution( wvecBar , ABs )
-
-  let sumW = sumOfWVec( N )
+  let Aconv   = fieldConvolution( wvecBar , As )
+  let Bconv   = fieldConvolution( wvecBar , Bs )
 
   var output: seq[F] = newSeq[F]( N )
  
   for k in 0..<N:
-    output[k] = As[k]*Bconv[k] + Bs[k]*Aconv[k]   # - ABconv[k] - ABs[k]*sumW
+    output[k] = As[k]*Bconv[k] + Bs[k]*Aconv[k]  
 
   return output
 
