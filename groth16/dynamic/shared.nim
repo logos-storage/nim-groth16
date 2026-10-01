@@ -109,6 +109,17 @@ proc inplaceMulByFFTofWVecBar*( xs: var seq[F] ) =
     let u = c + intToFr(i) * invN
     xs[k] *= u
 
+# pointwise multiply by `FFT[Wbar]_k = Bar[FFT[W]]_k` times a scalar
+proc scaledInplaceMulByFFTofWVecBar*( xs: var seq[F] , s: F ) = 
+  let N    = xs.len
+  let fN   = intToFr( N )
+  let invN = invFr(  fN ) * s
+  let c    = divBy2Fr(oneFr - fN) * invN
+  for k in 0..<N:
+    let i = (if k==0: 0 else: N-k)
+    let u = c + intToFr(i) * invN
+    xs[k] *= u
+
 #---------------------------------------
 
 # pointwise multiply group elements by `FFT[W]_k = (k + (1-N)/2) / N`
@@ -380,7 +391,6 @@ func crossTermCoeffs*(D: Domain, As: seq[F], Bs: seq[F]) : seq[F] =
   let sumW   = sumOfWVec( N )
 
   var output: seq[F] = newSeq[F]( N )
- 
   for k in 0..<N:
     output[k] = As[k]*Bconv[k] + Bs[k]*Aconv[k] - ABconv[k] - ABs[k]*sumW
 
@@ -388,20 +398,58 @@ func crossTermCoeffs*(D: Domain, As: seq[F], Bs: seq[F]) : seq[F] =
 
 #---------------------------------------
 
-func crossTermCoeffsSubgroup*(wvec: seq[F], sg: Subgroup, As: seq[F], Bs: seq[F]) : seq[F] =
+# we restrict Wbar on a subgroup, and convolve a small vector on that
+func fieldConvolutionWithRestrictedWVecBar*(sg: Subgroup, xs: seq[F]): seq[F] = 
 
-  let D = sg.smallDomain
-  let N = D.domainSize
-  assert( N == As.len )
-  assert( N == Bs.len )
+  let N   = sg.bigDomain.domainSize
+  let D   = sg.smallDomain
+  let K   = D.domainSize
+  let ell = N div K
+
+  assert( K == xs.len )
+
+  var us = forwardNTT(xs, D) 
+  scaledInplaceMulByFFTofWVecBar( us , invFr(intToFr(ell)) )
+  return inverseNTT(us, D)
+
+#-------------------
+
+# cross-term on the subgroup, so O(D*log(D))
+func crossTermCoeffsSubgroupOld*(wvec: seq[F], sg: Subgroup, As: seq[F], Bs: seq[F]) : seq[F] =
+
+  let N   = sg.bigDomain.domainSize
+  let D   = sg.smallDomain
+  let K   = D.domainSize
+
+  assert( K == As.len )
+  assert( K == Bs.len )
 
   let wvecBar = selectOnSubgroup( sg , fftReverseVec(wvec) )
   let Aconv   = fieldConvolution( wvecBar , As )
   let Bconv   = fieldConvolution( wvecBar , Bs )
 
-  var output: seq[F] = newSeq[F]( N )
- 
-  for k in 0..<N:
+  var output: seq[F] = newSeq[F]( K )
+  for k in 0..<K:
+    output[k] = As[k]*Bconv[k] + Bs[k]*Aconv[k]  
+
+  return output
+
+# a version doesn't requiring an explicit wvec vector
+proc crossTermCoeffsSubgroup*(sg: Subgroup, As: seq[F], Bs: seq[F]) : seq[F] =
+
+  let N   = sg.bigDomain.domainSize
+  let D   = sg.smallDomain
+  let K   = D.domainSize
+  let ell = N div K
+
+  assert( K == As.len )
+  assert( K == Bs.len )
+
+  let Aconv = fieldConvolutionWithRestrictedWVecBar(sg, As)
+  let Bconv = fieldConvolutionWithRestrictedWVecBar(sg, Bs)
+
+  var output: seq[F] = newSeq[F]( K )
+  for k in 0..<K:
     output[k] = As[k]*Bconv[k] + Bs[k]*Aconv[k]  
 
   return output

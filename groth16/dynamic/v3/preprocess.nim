@@ -42,19 +42,12 @@ func projectionElementsV3*(setup: DynaSetupV3, As: seq[F] ): seq[G1] =
 
   var Us: seq[G1] = newSeq[G1]( K )
 
-  # let fldN : F = intToFr( N ) 
-  # let sumW : F = sumOfWVec( N ) 
-
   let WBarStarA : seq[F]  = fieldConvolveWithWVecBarOnSubgroup( sg , As ) 
   let ALstarW   : seq[G1] = groupConvolveWithWVecOnSubgroup( sg , pointwiseScaleG1( As , setup.pointsDeltaLZ ) )
 
-  # 2*d scalar multiplications + the group convolution above
+  # dominated by 2*d scalar multiplications + the group convolution above
   for k in 0..<K: 
- 
     let ellk = ell*k
-    
-    # let cf : F = WBarStarA[k] - As[ellk] * sumW
-    # Us[k] = ALstarW[k] - (As[ellk] ** setup.wConvDeltaLZ[ellk]) + (cf ** setup.pointsDeltaLZ[ellk])
 
     Us[k] = (As[ellk] ** setup.miniDiagPoints[k]) +         # diagonal
             ALstarW[k]                            +         # off-diagonal, "group convolution"
@@ -138,7 +131,7 @@ proc dynaPreProofV3*(zkey: ZKey, setup: DynaSetupV3, partialWitness: PartialWitn
   partialProof.partial_pi_c += nonlin
 
   var preprocess : DynaPreprocessV3
-  withMeasureTime(printTimings,"XXX precomputing the \"projection\" and then the unified points"):
+  withMeasureTime(printTimings,"precomputing the \"projection\" and then the unified points"):
     preprocess = dynaPreprocessV3( zkey, setup, partialAB, partialMask, zdeltaMask )
 
   return DynaPreProofV3( partialProof   : partialProof ,

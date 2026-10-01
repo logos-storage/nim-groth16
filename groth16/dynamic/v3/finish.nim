@@ -149,7 +149,7 @@ proc finishDynaProofWithMaskV3*( zkey: ZKey, wtns: Witness, dynaPreProof: DynaPr
 
   let partialMask = dynaPreProof.partialProof.partial_mask
 
-  let wvec    = setup.weightVec 
+  # let wvec    = setup.weightVec 
   # let wvecRev = fftReverseVec( wvec )
 
   var deltaAB: OnlyAB
@@ -181,7 +181,7 @@ proc finishDynaProofWithMaskV3*( zkey: ZKey, wtns: Witness, dynaPreProof: DynaPr
     let miniAz = selectOnSubgroup( sg , deltaAB.valuesAz ) 
     let miniBz = selectOnSubgroup( sg , deltaAB.valuesBz )
 
-    let cross_cs1 = crossTermCoeffsSubgroup( wvec , sg , miniAz , miniBz )
+    let cross_cs1 = crossTermCoeffsSubgroup( sg , miniAz , miniBz )
     let cross_ps1 = selectOnSubgroup( sg , dynaPreProof.dynaSetup.pointsDeltaLZ )
 
     let diagAB  = pointwiseProdFr( miniAz, miniBz )

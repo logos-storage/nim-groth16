@@ -169,6 +169,14 @@ proc pointwiseProdFr*(xs: seq[F], ys: seq[F]): seq[F] =
     zs[i] = xs[i] * ys[i]
   return zs
 
+proc pointwiseDivFr*(xs: seq[F], ys: seq[F]): seq[F] =
+  let N = xs.len
+  assert( N == ys.len )
+  var zs : seq[F] = newSeq[F]( N )
+  for i in 0..<N:
+    zs[i] = xs[i] / ys[i]
+  return zs
+
 func dotProdFr*(xs, ys: seq[F]): F =
   let n = xs.len
   assert( n == ys.len, "dotProdFr: incompatible vector lengths" )

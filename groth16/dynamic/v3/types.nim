@@ -21,7 +21,6 @@ type
   # things we can compute at circuit setup time
   DynaSetupV3* = object
     imageSubgroup*  : Subgroup     # the subgroup the changes fall on
-    weightVec*      : seq[F]       # the values `W_k` (it's surprisingly slow to re-compute in the finish part!)
     pointsDeltaLZ*  : seq[G1]      # the points `delta^-1 * L_i(tau) * Z(tau) * g1` where `Z(x) = x^N-1`
     miniDiagPoints* : seq[G1]      # Psi_k = delta^-1 * psi_k(tau) * Z(tau) * g1` (diagonal) points on the subgroup
 

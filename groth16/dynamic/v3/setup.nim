@@ -39,17 +39,13 @@ proc dynaSetupV3FromZKey*(zkey: Zkey, subgroupSize: int, pool: Taskpool ): DynaS
   let deltaLZ   = inverseGroupFFT( deltaZTau , D )
   let sumW      = sumOfWVec( N )
 
-  let wvec    = calculateWVec( D )
-  # let wconv   = groupConvolution( wvec , deltaLZ )
-  # let miniPts = selectOnSubgroup( sg , calculateDiagPhiFFT1( wvec , deltaLZ , wconv ) ) 
-
+  # calculate the diagonal Psi_k points on the subgroup
   var hs: seq[G1] = groupConvolveWithWVecOnSubgroup( sg , deltaLZ )
   for i in 0..<K:
     hs[i] += (sumW ** deltaLZ[ell*i])
     hs[i] =  negG1(hs[i])
 
   return DynaSetupV3( imageSubgroup  : sg      ,
-                      weightVec      : wvec    ,       # TODO: remove this too
                       pointsDeltaLZ  : deltaLZ , 
                       miniDiagPoints : hs      )
 
