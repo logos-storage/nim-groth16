@@ -175,7 +175,7 @@ proc cliMain(cfg: Config) =
   
   if cfg.debug:
     printGrothHeader(zkey.header)
-    printR1csStats(zkey)
+    printMatrixStats(zkey)
     # debugPrintCoeffs(zkey.coeffs)
 
   if cfg.partial_sanity:
