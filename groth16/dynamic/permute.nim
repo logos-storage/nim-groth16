@@ -179,7 +179,8 @@ proc zkeyFindRowPermutation*(zkey: ZKey, witness_delta_mask: seq[bool]): (int,Pe
 
 #-------------------------------------------------------------------------------
 
-proc r1csPermuteToSubgroup*(r1cs_orig: R1CS, witness_delta_mask: seq[bool], do_add_malleability_eqs: bool = true ): R1CS =
+# returns the subgroup size too
+proc r1csPermuteToSubgroup*(r1cs_orig: R1CS, witness_delta_mask: seq[bool], do_add_malleability_eqs: bool = true ): (R1CS,int) =
  
   var r1cs: R1CS
   if do_add_malleability_eqs: 
@@ -206,11 +207,13 @@ proc r1csPermuteToSubgroup*(r1cs_orig: R1CS, witness_delta_mask: seq[bool], do_a
   echo "witness update size = " & $countTrues(witness_delta_mask)
   echo "total constraints   = " & $permutationSize(perm)
   echo "subgroup size       = " & $K
-  return permuteR1CSRows( perm , r1cs )
+  return (permuteR1CSRows( perm , r1cs ) , K)
 
-proc exportPermutedR1CS*(fname: string, r1cs: R1CS, witness_delta_mask: seq[bool] ) =
-  let newR1CS = r1csPermuteToSubgroup( r1cs, witness_delta_mask )
+# returns the subgroup size
+proc exportPermutedR1CS*(fname: string, r1cs: R1CS, witness_delta_mask: seq[bool] ): int =
+  let (newR1CS, subgroupSize) = r1csPermuteToSubgroup( r1cs, witness_delta_mask )
   exportR1CS(fname, newR1CS)
+  return subgroupSize
 
 #-------------------------------------------------------------------------------
 

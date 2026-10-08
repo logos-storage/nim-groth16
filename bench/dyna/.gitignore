@@ -1,0 +1,7 @@
+.DS_Store
+*.r1cs
+dyna_bench
+dyna_bench.exe
+config.nims
+nimble.develop
+nimble.paths
