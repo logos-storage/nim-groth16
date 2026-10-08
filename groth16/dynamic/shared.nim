@@ -256,9 +256,7 @@ func buildOnlyAB*( zkey: ZKey, pwitness: seq[Option[F]] ): OnlyAB =
 #---------------------------------------
 
 # computes the vectors A*z, B*z (but skips C*z), and also some image masks under A and B
-func buildPartialAB*( zkey: ZKey, pwitness: seq[Option[F]] ): PartialAB =
-  let hdr: GrothHeader = zkey.header
-  let domSize = hdr.domainSize
+func buildPartialABfromCoeffs*( domSize: int, zkeyCoeffs: seq[Coeff], pwitness: seq[Option[F]] ): PartialAB =
 
   var valuesAz = newSeq[F](domSize)
   var valuesBz = newSeq[F](domSize)
@@ -270,7 +268,7 @@ func buildPartialAB*( zkey: ZKey, pwitness: seq[Option[F]] ): PartialAB =
     complImageA[i] = false
     complImageB[i] = false
 
-  for entry in zkey.coeffs:
+  for entry in zkeyCoeffs:
     if not isZeroFr(entry.coeff):
       case entry.matrix 
   
@@ -292,6 +290,12 @@ func buildPartialAB*( zkey: ZKey, pwitness: seq[Option[F]] ): PartialAB =
                     valuesBz: valuesBz, 
                     complImageA: complImageA,
                     complImageB: complImageB )
+
+# computes the vectors A*z, B*z (but skips C*z), and also some image masks under A and B
+func buildPartialAB*( zkey: ZKey, pwitness: seq[Option[F]] ): PartialAB =
+  let hdr: GrothHeader = zkey.header
+  let domSize = hdr.domainSize
+  return buildPartialABfromCoeffs( domSize, zkey.coeffs, pwitness )
 
 #-------------------------------------------------------------------------------
 # the phi(x) polynomials and Lagrange product decomposition (for testing purposes)

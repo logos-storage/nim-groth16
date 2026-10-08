@@ -86,14 +86,15 @@ func selectOnSubgroup*[T]( sg: Subgroup , xs: seq[T] ): seq[T] =
 func liesInSubgroup*( sg: Subgroup, mask: seq[bool] ): bool = 
   let N = sg.bigDomain.domainSize
   let K = sg.smallDomain.domainSize
-  let J = N div K
+  let ell = N div K
 
   assert( N == mask.len )
 
   var ok = true
   for (i,b) in mask.pairs:
     if b:
-      ok = ok and ((i mod J) == 0)
+      let this = ((i mod ell) == 0)
+      ok = (ok and this)
 
   return ok
 

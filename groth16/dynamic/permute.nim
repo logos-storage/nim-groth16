@@ -188,11 +188,20 @@ proc r1csPermuteToSubgroup*(r1cs_orig: R1CS, witness_delta_mask: seq[bool], do_a
   else:
     r1cs = r1cs_orig
 
+  let N0    = r1cs.nConstr
   let log2  = ceilingLog2(r1cs.nConstr)
   let N     = (1 shl log2)
   let npubs = r1cs.cfg.nPubIn + r1cs.cfg.nPubOut + 1
-  let N1    = N - npubs
+
+#[
+  # snarkjs adds some extra rows for the public input...
+  # but TO THE ZKEY, not to the R1CS!
+  # and we just added them above...
+
+  let N1 = N - npubs
   assert( r1cs.nConstr <= N1  , "snarkjs adds some extra rows for the public inputs" )
+]#
+
   let M    = r1cs.cfg.nWires
   let newDims = MatrixDims( nrows: N, ncols: M )
   let mats = r1csToSparseMatrices( r1cs )
@@ -200,18 +209,21 @@ proc r1csPermuteToSubgroup*(r1cs_orig: R1CS, witness_delta_mask: seq[bool], do_a
   var B = mats.B ; B.dims = newDims
   var (K, perm) = findRowPermutation( A , B , witness_delta_mask )
 
+#[
   # snarkjs adds some extra row for the public inputs...
   # so we need to subtract that many to have enough space
   perm.srcIndices = toSeq(perm.srcIndices[0..<N1])
-  
-  echo "witness update size = " & $countTrues(witness_delta_mask)
-  echo "total constraints   = " & $permutationSize(perm)
-  echo "subgroup size       = " & $K
+]#
+
+  echo "witness update size  = " & $countTrues(witness_delta_mask)
+  echo "original constraints = " & $r1cs_orig.nConstr
+  echo "total constraints    = " & $N0   # permutationSize(perm)
+  echo "subgroup size        = " & $K
   return (permuteR1CSRows( perm , r1cs ) , K)
 
 # returns the subgroup size
-proc exportPermutedR1CS*(fname: string, r1cs: R1CS, witness_delta_mask: seq[bool] ): int =
-  let (newR1CS, subgroupSize) = r1csPermuteToSubgroup( r1cs, witness_delta_mask )
+proc exportPermutedR1CS*(fname: string, orig_r1cs: R1CS, witness_delta_mask: seq[bool] ): int =
+  let (newR1CS, subgroupSize) = r1csPermuteToSubgroup( orig_r1cs, witness_delta_mask )
   exportR1CS(fname, newR1CS)
   return subgroupSize
 

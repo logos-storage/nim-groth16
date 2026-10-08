@@ -91,10 +91,7 @@ proc dynaPreprocessV3*(zkey: ZKey, setup: DynaSetupV3, partialAB: PartialAB, par
 
 #-------------------------------------------------------------------------------
 
-proc dynaPreProofV3*(zkey: ZKey, setup: DynaSetupV3, partialWitness: PartialWitness, pool: Taskpool, printTimings: bool): DynaPreProofV3 =
-
-  let N = zkey.header.domainSize
-  let D = createDomain(N)
+proc computeDeltaImages*(zkey: ZKey, partialWitness: PartialWitness, printTimings: bool): (PartialAB,DeltaImages) = 
 
   let partialMask = partialWitnessMask( partialWitness )
   let zdeltaMask  = notBoolSeq( partialMask )
@@ -108,6 +105,31 @@ proc dynaPreProofV3*(zkey: ZKey, setup: DynaSetupV3, partialWitness: PartialWitn
                                  imageB  : partialAB.complImageB ,
                                  imageAB : imageAB               )
 
+  return (partialAB, deltaImages)
+
+#-------------------
+
+proc dynaPreProofV3*(zkey: ZKey, setup: DynaSetupV3, partialWitness: PartialWitness, pool: Taskpool, printTimings: bool): DynaPreProofV3 =
+
+  let N = zkey.header.domainSize
+  let D = createDomain(N)
+
+  let partialMask = partialWitnessMask( partialWitness )
+  let zdeltaMask  = notBoolSeq( partialMask )
+
+#[
+  var partialAB : PartialAB
+  withMeasureTime(printTimings,"build partial AB"):
+    partialAB = buildPartialAB( zkey, partialWitness.values )
+ 
+  let imageAB = orBoolSeqs( partialAB.complImageA , partialAB.complImageB )
+  let deltaImages = DeltaImages( imageA  : partialAB.complImageA ,
+                                 imageB  : partialAB.complImageB ,
+                                 imageAB : imageAB               )
+]#
+  let (partialAB, deltaImages) = computeDeltaImages(zkey, partialWitness, printTimings)
+  let imageAB = deltaImages.imageAB
+
   # guess the smaller domain
   let k0    = countTrues(imageAB)
   let log2k = ceilingLog2(k0)
@@ -115,7 +137,18 @@ proc dynaPreProofV3*(zkey: ZKey, setup: DynaSetupV3, partialWitness: PartialWitn
   let imgSubgroup = createSubgroup( D , K )
 
   echo "size of the delta image = " & $countTrues(imageAB)
+  echo "size of the full domain = " & $N
+  echo "size of the subgroup    = " & $K
   # echo $trueIndices( imageAB )
+
+#[
+  # just debugging
+  let ell = N div K
+  for i,b in imageAB.pairs:
+    if b:
+      if (i mod ell) != 0:
+        echo "PROBLEMATIC IMAGE POINT: i=" & $i & " / i_mod_ell=" & $(i mod ell) & " / ell=" & $ell
+]#
 
   assert( liesInSubgroup( imgSubgroup , imageAB ) , "in V3, we expect the delta image to lie in the proper subgroup !!" )
 
