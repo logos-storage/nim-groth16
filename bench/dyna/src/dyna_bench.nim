@@ -76,8 +76,9 @@ const ptauPath     = "~/zk/ptau"
 type 
 
   Params = object
-    fullSize   : int
-    updateSize : int
+    fullSize       : int
+    witnessUpdate  : int
+    imageUpdate    : int
 
   Groth16Timings = object
     proofTime      : float64
@@ -98,7 +99,8 @@ type
     finishTime     : float64
 
   Timings = object
-    params      : Params
+    tgtParams   : Params
+    realParams  : Params
     witnessgen  : float64
     groth16     : Groth16Timings
     partial     : PartialTimings
@@ -255,7 +257,7 @@ proc benchmarkTarget(pool: Taskpool, bigSize: int, smallSize: int) =
   let origR1CSFile     = buildDir & "/main.r1cs"
   let permutedR1CSFile = buildDir & "/permuted.r1cs"
   let origR1CS = parseR1CS(origR1CSFile)
-  let subgroupSize = exportPermutedR1CS( permutedR1CSFile, origR1cs, witnessDeltaMask ) 
+  let subgroupSize = exportPermutedR1CS( permutedR1CSFile, origR1CS, witnessDeltaMask ) 
   let permutedR1CS = parseR1CS(permutedR1CSFile)
   printR1CSMetaData(permutedR1CS)
 
@@ -284,6 +286,14 @@ proc benchmarkTarget(pool: Taskpool, bigSize: int, smallSize: int) =
   let permutedVKey = extractVKey( permutedZKey )
 
   let circomFullWitness = parseWitness("main.wtns")
+
+  # --- computing the delta image ---
+
+  let (partialAB, deltaImages) = computeDeltaImages(permutedZKey, partialWitness2, false)
+  let imageAB   = deltaImages.imageAB
+  let imageSize = countTrues(imageAB)
+  echo "number of constraints = " & ($permutedR1CS.nConstr)
+  echo "size of imageAB       = " & ($imageSize)
 
   # --- standard Groth16 proof --- 
 
@@ -337,7 +347,7 @@ proc benchmarkTarget(pool: Taskpool, bigSize: int, smallSize: int) =
     v1_preproof = dynaPreProofV1( permutedZKey, v1_setup, partialWitness2, pool, false )
 
   var v1_proof: Proof
-  let v1_FinishTime = measuringTime(true, "dynamic finish V3"):
+  let v1_FinishTime = measuringTime(true, "dynamic finish V1"):
     v1_proof = finishDynaProofV1( permutedZKey, circomFullWitness, v1_preproof, pool, false )
 
   block:
@@ -380,10 +390,16 @@ proc benchmarkTarget(pool: Taskpool, bigSize: int, smallSize: int) =
 
   echoPhase("export timings...")
 
-  let params = Params( fullSize   : bigSize   ,
-                       updateSize : smallSize )
+  let tgtParams = Params( fullSize      : bigSize   ,
+                          witnessUpdate : smallSize ,
+                          imageUpdate   : smallSize )
 
-  let timings = Timings( params     : params          , 
+  let realParams = Params( fullSize      : permutedR1CS.nConstr         ,
+                           witnessUpdate : countTrues(witnessDeltaMask) , 
+                           imageUpdate   : imageSize                    )
+
+  let timings = Timings( tgtParams  : tgtParams       , 
+                         realParams : realParams      ,
                          witnessgen : witnessgen_time ,
                          groth16    : groth16_timings ,
                          partial    : partial_timings ,
@@ -407,5 +423,12 @@ when isMainModule:
   let nthreads = 1
   var pool  = Taskpool.new(nthreads)
  
-  benchmarkTarget(pool, 8192, 512)
+  # benchmarkTarget(pool, 2048, 128)
+  # benchmarkTarget(pool, 8192, 512)
+
+  let smallSizes = @[128,256,512,1024]
+  let bigSizes   = @[2048,4096,8192,16384,32768]
+  for big in bigSizes:
+    for small in smallSizes:
+      benchmarkTarget(pool, big, small)
 
